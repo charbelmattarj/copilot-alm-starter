@@ -49,7 +49,39 @@ solutions/YourSolution/
 
 ## Best Practices
 
-### 1. Use Descriptive Names
+### 1. One Agent Per Solution
+
+> ⚠️ **Critical for Scalability**: Always maintain a **1:1 relationship** between agents and solutions.
+
+**Why?**
+- Independent deployment cycles for each agent
+- Smaller, faster deployments
+- Easier rollbacks
+- Clearer ownership and change tracking
+- Avoids deployment conflicts
+
+**Do this:**
+```
+solutions/
+├── CustomerSupportAgent/     # One solution
+│   └── bots/customer-support-agent/
+├── HRAssistantAgent/         # Another solution
+│   └── bots/hr-assistant-agent/
+└── ITHelpdeskAgent/          # Third solution
+    └── bots/it-helpdesk-agent/
+```
+
+**Avoid this:**
+```
+solutions/
+└── AllMyAgents/              # ❌ Multiple agents in one solution
+    └── bots/
+        ├── customer-support-agent/
+        ├── hr-assistant-agent/
+        └── it-helpdesk-agent/
+```
+
+### 2. Use Descriptive Names
 
 ```
 ✅ Good: cust_OrderStatusTopic
@@ -60,7 +92,7 @@ solutions/YourSolution/
 - Be descriptive but concise
 - Follow consistent naming conventions
 
-### 2. Leverage Environment Variables
+### 3. Leverage Environment Variables
 
 Store configuration that changes between environments:
 
@@ -80,7 +112,7 @@ Store configuration that changes between environments:
 }
 ```
 
-### 3. Modular Topic Design
+### 4. Modular Topic Design
 
 Break complex conversations into smaller, reusable topics:
 
@@ -92,14 +124,14 @@ Main Topic
 └── Subtopic: Confirm Result
 ```
 
-### 4. Error Handling
+### 5. Error Handling
 
 Always include:
 - Fallback topic for unrecognized inputs
 - Error handling topic for failures
 - Escalation path to human agents
 
-### 5. Version Your Solutions
+### 6. Version Your Solutions
 
 Increment version numbers meaningfully:
 

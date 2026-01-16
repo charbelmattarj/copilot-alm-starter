@@ -255,3 +255,82 @@ For sensitive values, use GitHub secrets:
 - Check the file path is correct
 - Verify JSON syntax is valid
 - Enable verbose logging for debugging
+
+---
+
+## Post-Deployment Configuration
+
+> ⚠️ **Important**: Some configurations cannot be fully automated and require manual setup in higher environments after initial deployment.
+
+### Application Insights
+
+Application Insights must be configured **manually in each environment** after deployment:
+
+1. **Create Application Insights resource** (if not already exists):
+   - In Azure Portal, create an Application Insights resource for each environment
+   - Note the **Instrumentation Key** or **Connection String**
+
+2. **Configure in Copilot Studio**:
+   - Open the agent in the target environment
+   - Go to **Settings > Agent details > Advanced**
+   - Add your Application Insights connection string
+   - Save and publish
+
+3. **Repeat for each environment**:
+   | Environment | App Insights Resource |
+   |-------------|-----------------------|
+   | Test | `appins-youragent-test` |
+   | Prod | `appins-youragent-prod` |
+
+> 💡 **Tip**: Use separate Application Insights resources per environment to keep telemetry isolated.
+
+### Connections
+
+Connections must be **re-established in each environment**:
+
+1. **Before first deployment**:
+   - Create necessary connections in the target environment
+   - These run under a service account or user identity
+   - Note the Connection IDs for your settings file
+
+2. **After deployment**:
+   - Verify all connection references are bound
+   - Test each connector by triggering a flow or action
+   - Re-authenticate if connections show errors
+
+3. **Common connections to re-establish**:
+   - Dataverse (often automatic with service principal)
+   - SharePoint
+   - Outlook/Office 365
+   - Custom connectors
+   - Azure services (Key Vault, Storage, etc.)
+
+### Post-Deployment Checklist
+
+After deploying to a new environment for the first time:
+
+- [ ] **Application Insights** - Configure in agent settings
+- [ ] **Connections** - Verify all are bound and working
+- [ ] **Environment variables** - Confirm values are correct
+- [ ] **Channel configuration** - Re-configure web chat, Teams, etc.
+- [ ] **Authentication** - Configure SSO if used
+- [ ] **Test the agent** - Run through key scenarios manually
+- [ ] **Publish** - Publish the agent in the new environment
+
+### Automating Post-Deployment Tasks
+
+While some tasks are manual, you can automate reminders:
+
+```yaml
+# In your workflow, add a summary comment
+- name: Post-deployment reminder
+  if: success()
+  run: |
+    echo "## ✅ Deployment Complete" >> $GITHUB_STEP_SUMMARY
+    echo "" >> $GITHUB_STEP_SUMMARY
+    echo "### Manual steps required:" >> $GITHUB_STEP_SUMMARY
+    echo "- [ ] Configure Application Insights" >> $GITHUB_STEP_SUMMARY
+    echo "- [ ] Verify connections are working" >> $GITHUB_STEP_SUMMARY
+    echo "- [ ] Test agent in target environment" >> $GITHUB_STEP_SUMMARY
+    echo "- [ ] Publish agent if not auto-published" >> $GITHUB_STEP_SUMMARY
+```

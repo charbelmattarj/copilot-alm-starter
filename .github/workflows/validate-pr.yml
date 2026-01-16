@@ -4,151 +4,151 @@
 name: Validate PR
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'solutions/**'
-      - 'settings/**'
+    pull_request:
+        branches:
+            - main
+        paths:
+            - "solutions/**"
+            - "settings/**"
 
 jobs:
-  validate:
-    runs-on: windows-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    validate:
+        runs-on: windows-latest
 
-      - name: Install Power Platform CLI
-        uses: microsoft/powerplatform-actions/actions-install@v1
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-      - name: Detect changed solutions
-        id: detect
-        shell: pwsh
-        run: |
-          $changedFiles = git diff --name-only origin/${{ github.base_ref }}...HEAD
-          $solutions = $changedFiles | 
-              Where-Object { $_ -match '^solutions/([^/]+)/' } | 
-              ForEach-Object { $matches[1] } | 
-              Select-Object -Unique
-          
-          if ($solutions) {
-              $json = $solutions | ConvertTo-Json -Compress
-              if ($solutions.Count -eq 1) { $json = "[$json]" }
-              echo "solutions=$json" >> $env:GITHUB_OUTPUT
-              Write-Host "Solutions to validate: $($solutions -join ', ')"
-          } else {
-              echo "solutions=[]" >> $env:GITHUB_OUTPUT
-              Write-Host "No solution changes detected"
-          }
+            - name: Install Power Platform CLI
+              uses: microsoft/powerplatform-actions/actions-install@v1
 
-      - name: Validate solution structure
-        shell: pwsh
-        run: |
-          $solutions = '${{ steps.detect.outputs.solutions }}' | ConvertFrom-Json
-          $errors = @()
-          
-          foreach ($solution in $solutions) {
-              Write-Host "Validating: $solution"
-              $solutionPath = "./solutions/$solution"
-              
-              # Check Solution.xml exists
-              $solutionXml = "$solutionPath/Other/Solution.xml"
-              if (-not (Test-Path $solutionXml)) {
-                  $errors += "❌ $solution : Missing Solution.xml"
-                  continue
-              }
-              
-              # Parse Solution.xml
-              try {
-                  [xml]$xml = Get-Content $solutionXml
-                  $version = $xml.ImportExportXml.SolutionManifest.Version
-                  $uniqueName = $xml.ImportExportXml.SolutionManifest.UniqueName
-                  
-                  Write-Host "  ✅ Solution: $uniqueName"
-                  Write-Host "  ✅ Version: $version"
-                  
-                  # Validate version format
-                  if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-                      $errors += "⚠️ $solution : Invalid version format: $version (expected x.x.x.x)"
-                  }
-                  
-                  # Check for missing dependencies
-                  $missingDeps = $xml.ImportExportXml.SolutionManifest.MissingDependencies.MissingDependency
-                  if ($missingDeps) {
-                      $count = if ($missingDeps -is [System.Array]) { $missingDeps.Count } else { 1 }
-                      $errors += "⚠️ $solution : Has $count missing dependencies"
-                  }
-                  
-              } catch {
-                  $errors += "❌ $solution : Failed to parse Solution.xml - $($_.Exception.Message)"
-              }
-          }
-          
-          if ($errors.Count -gt 0) {
-              Write-Host "`n=== Validation Issues ===" -ForegroundColor Yellow
-              $errors | ForEach-Object { Write-Host $_ }
-              
-              # Fail on errors (❌), warn on warnings (⚠️)
-              $criticalErrors = $errors | Where-Object { $_ -match '^❌' }
-              if ($criticalErrors.Count -gt 0) {
-                  exit 1
-              }
-          } else {
-              Write-Host "`n✅ All validations passed!" -ForegroundColor Green
-          }
+            - name: Detect changed solutions
+              id: detect
+              shell: pwsh
+              run: |
+                  $changedFiles = git diff --name-only origin/${{ github.base_ref }}...HEAD
+                  $solutions = $changedFiles | 
+                      Where-Object { $_ -match '^solutions/([^/]+)/' } | 
+                      ForEach-Object { $matches[1] } | 
+                      Select-Object -Unique
 
-      - name: Test solution pack
-        shell: pwsh
-        run: |
-          $solutions = '${{ steps.detect.outputs.solutions }}' | ConvertFrom-Json
-          
-          foreach ($solution in $solutions) {
-              Write-Host "Testing pack for: $solution"
-              
-              $solutionPath = "./solutions/$solution"
-              $outputFile = "${{ runner.temp }}/${solution}_test.zip"
-              
-              try {
-                  pac solution pack `
-                      --zipfile "$outputFile" `
-                      --folder "$solutionPath" `
-                      --packagetype Unmanaged
-                  
-                  if (Test-Path $outputFile) {
-                      $size = (Get-Item $outputFile).Length / 1MB
-                      Write-Host "  ✅ Pack successful (${size:N2} MB)"
+                  if ($solutions) {
+                      $json = $solutions | ConvertTo-Json -Compress
+                      if ($solutions.Count -eq 1) { $json = "[$json]" }
+                      echo "solutions=$json" >> $env:GITHUB_OUTPUT
+                      Write-Host "Solutions to validate: $($solutions -join ', ')"
                   } else {
-                      Write-Error "Pack did not produce output file"
-                      exit 1
+                      echo "solutions=[]" >> $env:GITHUB_OUTPUT
+                      Write-Host "No solution changes detected"
                   }
-              } catch {
-                  Write-Error "Pack failed: $($_.Exception.Message)"
-                  exit 1
-              }
-          }
 
-      - name: Add PR comment
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const solutions = JSON.parse('${{ steps.detect.outputs.solutions }}');
-            const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
-            
-            const body = `## ${status} Solution Validation
-            
-            **Solutions checked:** ${solutions.join(', ') || 'None'}
-            **Status:** ${{ job.status }}
-            
-            ${status === '✅' ? 'All validations passed! Ready for review.' : 'Please fix the validation errors above.'}
-            `;
-            
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
+            - name: Validate solution structure
+              shell: pwsh
+              run: |
+                  $solutions = '${{ steps.detect.outputs.solutions }}' | ConvertFrom-Json
+                  $errors = @()
+
+                  foreach ($solution in $solutions) {
+                      Write-Host "Validating: $solution"
+                      $solutionPath = "./solutions/$solution"
+                      
+                      # Check Solution.xml exists
+                      $solutionXml = "$solutionPath/Other/Solution.xml"
+                      if (-not (Test-Path $solutionXml)) {
+                          $errors += "❌ $solution : Missing Solution.xml"
+                          continue
+                      }
+                      
+                      # Parse Solution.xml
+                      try {
+                          [xml]$xml = Get-Content $solutionXml
+                          $version = $xml.ImportExportXml.SolutionManifest.Version
+                          $uniqueName = $xml.ImportExportXml.SolutionManifest.UniqueName
+                          
+                          Write-Host "  ✅ Solution: $uniqueName"
+                          Write-Host "  ✅ Version: $version"
+                          
+                          # Validate version format
+                          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+                              $errors += "⚠️ $solution : Invalid version format: $version (expected x.x.x.x)"
+                          }
+                          
+                          # Check for missing dependencies
+                          $missingDeps = $xml.ImportExportXml.SolutionManifest.MissingDependencies.MissingDependency
+                          if ($missingDeps) {
+                              $count = if ($missingDeps -is [System.Array]) { $missingDeps.Count } else { 1 }
+                              $errors += "⚠️ $solution : Has $count missing dependencies"
+                          }
+                          
+                      } catch {
+                          $errors += "❌ $solution : Failed to parse Solution.xml - $($_.Exception.Message)"
+                      }
+                  }
+
+                  if ($errors.Count -gt 0) {
+                      Write-Host "`n=== Validation Issues ===" -ForegroundColor Yellow
+                      $errors | ForEach-Object { Write-Host $_ }
+                      
+                      # Fail on errors (❌), warn on warnings (⚠️)
+                      $criticalErrors = $errors | Where-Object { $_ -match '^❌' }
+                      if ($criticalErrors.Count -gt 0) {
+                          exit 1
+                      }
+                  } else {
+                      Write-Host "`n✅ All validations passed!" -ForegroundColor Green
+                  }
+
+            - name: Test solution pack
+              shell: pwsh
+              run: |
+                  $solutions = '${{ steps.detect.outputs.solutions }}' | ConvertFrom-Json
+
+                  foreach ($solution in $solutions) {
+                      Write-Host "Testing pack for: $solution"
+                      
+                      $solutionPath = "./solutions/$solution"
+                      $outputFile = "${{ runner.temp }}/${solution}_test.zip"
+                      
+                      try {
+                          pac solution pack `
+                              --zipfile "$outputFile" `
+                              --folder "$solutionPath" `
+                              --packagetype Unmanaged
+                          
+                          if (Test-Path $outputFile) {
+                              $size = (Get-Item $outputFile).Length / 1MB
+                              Write-Host "  ✅ Pack successful (${size:N2} MB)"
+                          } else {
+                              Write-Error "Pack did not produce output file"
+                              exit 1
+                          }
+                      } catch {
+                          Write-Error "Pack failed: $($_.Exception.Message)"
+                          exit 1
+                      }
+                  }
+
+            - name: Add PR comment
+              if: always()
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const solutions = JSON.parse('${{ steps.detect.outputs.solutions }}');
+                      const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
+
+                      const body = `## ${status} Solution Validation
+
+                      **Solutions checked:** ${solutions.join(', ') || 'None'}
+                      **Status:** ${{ job.status }}
+
+                      ${status === '✅' ? 'All validations passed! Ready for review.' : 'Please fix the validation errors above.'}
+                      `;
+
+                      github.rest.issues.createComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: context.issue.number,
+                        body: body
+                      });

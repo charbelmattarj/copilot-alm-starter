@@ -71,9 +71,9 @@ if (Test-Path $localSolutionXmlPath) {
             
             foreach ($dep in $missingDeps) {
                 $missingDependencies += @{
-                    RequiredComponent = $dep.Required.displayName
-                    RequiredSolution = $dep.Required.solution
-                    DependentType = $dep.Dependent.type
+                    RequiredComponent  = $dep.Required.displayName
+                    RequiredSolution   = $dep.Required.solution
+                    DependentType      = $dep.Dependent.type
                     DependentComponent = $dep.Dependent.displayName
                 }
                 
@@ -145,12 +145,12 @@ elseif ($targetBranchVersion) {
 
 # Output results
 $result = @{
-    ShouldCreatePR = $shouldCreatePR
+    ShouldCreatePR          = $shouldCreatePR
     VersionComparisonReason = $versionComparisonReason
-    IsNewSolution = $isNewSolution
-    CurrentVersion = $CurrentVersion
-    TargetBranchVersion = $targetBranchVersion
-    MissingDependencies = $missingDependencies
+    IsNewSolution           = $isNewSolution
+    CurrentVersion          = $CurrentVersion
+    TargetBranchVersion     = $targetBranchVersion
+    MissingDependencies     = $missingDependencies
 }
 
 # GitHub Actions output

@@ -55,9 +55,9 @@ if (Test-Path $solutionXml) {
     
     # Return as object for local use
     return @{
-        Name = $uniqueName
-        Version = $version
-        Publisher = $publisher
+        Name        = $uniqueName
+        Version     = $version
+        Publisher   = $publisher
         Description = $description
     }
 }

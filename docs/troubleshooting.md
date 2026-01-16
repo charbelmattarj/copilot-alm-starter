@@ -179,6 +179,51 @@ The version should be in format `X.X.X.X` (e.g., `1.0.0.0`)
 }
 ```
 
+## Post-Deployment Issues
+
+### "Agent deployed but not working"
+
+**Cause:** Some configurations don't transfer between environments.
+
+**Solution:**
+After deployment, verify these manually:
+
+1. **Application Insights** - Must be configured per environment
+   - Open agent in target environment
+   - Go to Settings > Agent details > Advanced
+   - Add the Application Insights connection string for that environment
+
+2. **Connections** - Must be re-established per environment
+   - Verify connection references are bound
+   - Test each connection by triggering an action
+   - Re-authenticate if needed
+
+3. **Publish the agent** - Changes may not be live
+   - Open agent in Copilot Studio
+   - Click Publish
+
+See [Post-Deployment Configuration](environment-configuration.md#post-deployment-configuration) for the full checklist.
+
+### "Application Insights not capturing data"
+
+**Cause:** App Insights isn't configured in the target environment.
+
+**Solution:**
+Application Insights configuration doesn't transfer with solution deployments:
+1. Create separate App Insights resources per environment
+2. Configure the connection string manually in each environment
+3. Verify data is flowing in the Azure Portal
+
+### "Connections failing after deployment"
+
+**Cause:** Connections are environment-specific and may need re-authentication.
+
+**Solution:**
+1. Go to Power Apps maker portal > Connections
+2. Find the connection showing errors
+3. Re-authenticate or repair the connection
+4. Verify the connection reference in the solution is bound correctly
+
 ## Common Error Messages
 
 | Error | Likely Cause | Quick Fix |
