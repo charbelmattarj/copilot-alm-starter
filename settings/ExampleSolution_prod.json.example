@@ -1,0 +1,9 @@
+{
+  "EnvironmentVariables": [
+    {
+      "SchemaName": "example_APIEndpoint",
+      "Value": "https://api.prod.example.com"
+    }
+  ],
+  "ConnectionReferences": []
+}

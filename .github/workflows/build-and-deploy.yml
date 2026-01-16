@@ -1,0 +1,305 @@
+# Build and Deploy Solution Workflow
+# Builds the solution from source and deploys to target environments
+
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'solutions/**'
+      - 'settings/**'
+  
+  workflow_dispatch:
+    inputs:
+      solution_name:
+        description: 'Solution to deploy (leave empty for all changed solutions)'
+        required: false
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - test
+          - prod
+        default: 'test'
+      deploy_as_managed:
+        description: 'Deploy as managed solution'
+        required: false
+        type: boolean
+        default: true
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Default solution - update this for your project
+  DEFAULT_SOLUTION: 'YourSolutionName'
+
+jobs:
+  # Detect which solutions changed
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      solutions: ${{ steps.detect.outputs.solutions }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed solutions
+        id: detect
+        shell: pwsh
+        run: |
+          $solutions = @()
+          
+          if ("${{ inputs.solution_name }}" -ne "") {
+              # Manual trigger with specific solution
+              $solutions = @("${{ inputs.solution_name }}")
+          } else {
+              # Detect from git diff
+              $changedFiles = git diff --name-only HEAD~1 HEAD
+              $solutionFolders = $changedFiles | 
+                  Where-Object { $_ -match '^solutions/([^/]+)/' } | 
+                  ForEach-Object { $matches[1] } | 
+                  Select-Object -Unique
+              
+              if ($solutionFolders) {
+                  $solutions = @($solutionFolders)
+              }
+          }
+          
+          if ($solutions.Count -gt 0) {
+              $json = $solutions | ConvertTo-Json -Compress
+              if ($solutions.Count -eq 1) { $json = "[$json]" }
+              echo "solutions=$json" >> $env:GITHUB_OUTPUT
+              echo "has_changes=true" >> $env:GITHUB_OUTPUT
+              Write-Host "Solutions to deploy: $($solutions -join ', ')"
+          } else {
+              echo "solutions=[]" >> $env:GITHUB_OUTPUT
+              echo "has_changes=false" >> $env:GITHUB_OUTPUT
+              Write-Host "No solution changes detected"
+          }
+
+  # Build solutions
+  build:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: windows-latest
+    
+    strategy:
+      matrix:
+        solution: ${{ fromJson(needs.detect-changes.outputs.solutions) }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Power Platform CLI
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      - name: Extract solution version
+        id: version
+        shell: pwsh
+        run: |
+          $solutionXml = "./solutions/${{ matrix.solution }}/Other/Solution.xml"
+          
+          if (Test-Path $solutionXml) {
+              [xml]$xml = Get-Content $solutionXml
+              $version = $xml.ImportExportXml.SolutionManifest.Version
+              Write-Host "Solution version: $version"
+              echo "version=$version" >> $env:GITHUB_OUTPUT
+          } else {
+              Write-Error "Solution.xml not found at $solutionXml"
+              exit 1
+          }
+
+      - name: Pack solution (unmanaged)
+        uses: microsoft/powerplatform-actions/pack-solution@v1
+        with:
+          solution-folder: solutions/${{ matrix.solution }}
+          solution-file: ${{ runner.temp }}/${{ matrix.solution }}_unmanaged.zip
+          solution-type: 'Unmanaged'
+
+      - name: Pack solution (managed)
+        uses: microsoft/powerplatform-actions/pack-solution@v1
+        with:
+          solution-folder: solutions/${{ matrix.solution }}
+          solution-file: ${{ runner.temp }}/${{ matrix.solution }}_managed.zip
+          solution-type: 'Managed'
+
+      - name: Upload solution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.solution }}-${{ steps.version.outputs.version }}
+          path: |
+            ${{ runner.temp }}/${{ matrix.solution }}_unmanaged.zip
+            ${{ runner.temp }}/${{ matrix.solution }}_managed.zip
+          retention-days: 30
+
+  # Deploy to Test environment
+  deploy-test:
+    needs: [detect-changes, build]
+    if: github.event_name == 'push' || inputs.environment == 'test'
+    runs-on: windows-latest
+    environment: test
+    
+    permissions:
+      id-token: write    # Required for federated credentials (OIDC)
+      contents: read
+    
+    strategy:
+      matrix:
+        solution: ${{ fromJson(needs.detect-changes.outputs.solutions) }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download solution artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ matrix.solution }}-*
+          path: ${{ runner.temp }}/artifacts
+          merge-multiple: true
+
+      # Authenticate using Workload Identity Federation (recommended)
+      - name: Azure Login (Federated Credentials)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Install Power Platform CLI
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      - name: Create PAC auth profile
+        shell: pwsh
+        run: |
+          pac auth create --environment "${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}" --name "deploy-profile"
+
+      - name: Check for deployment settings
+        id: settings
+        shell: pwsh
+        run: |
+          $settingsFile = "./settings/${{ matrix.solution }}_test.json"
+          if (Test-Path $settingsFile) {
+              Write-Host "Found deployment settings: $settingsFile"
+              echo "settings_file=$settingsFile" >> $env:GITHUB_OUTPUT
+              echo "has_settings=true" >> $env:GITHUB_OUTPUT
+          } else {
+              Write-Host "No deployment settings found for test environment"
+              echo "has_settings=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Import solution to Test
+        shell: pwsh
+        run: |
+          $importArgs = @(
+            "--path", "${{ runner.temp }}/artifacts/${{ matrix.solution }}_managed.zip",
+            "--force-overwrite",
+            "--publish-changes",
+            "--async"
+          )
+          
+          if ("${{ steps.settings.outputs.has_settings }}" -eq "true") {
+              $importArgs += "--settings-file"
+              $importArgs += "${{ steps.settings.outputs.settings_file }}"
+              Write-Host "Importing with deployment settings..."
+          }
+          
+          pac solution import @importArgs
+
+      - name: Deployment summary
+        shell: pwsh
+        run: |
+          Write-Host "✅ Successfully deployed ${{ matrix.solution }} to Test environment"
+          Write-Host "Environment: ${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}"
+
+  # Deploy to Production (requires approval)
+  deploy-prod:
+    needs: [detect-changes, build, deploy-test]
+    if: inputs.environment == 'prod'
+    runs-on: windows-latest
+    environment: prod
+    
+    permissions:
+      id-token: write    # Required for federated credentials (OIDC)
+      contents: read
+    
+    strategy:
+      matrix:
+        solution: ${{ fromJson(needs.detect-changes.outputs.solutions) }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download solution artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ matrix.solution }}-*
+          path: ${{ runner.temp }}/artifacts
+          merge-multiple: true
+
+      # Authenticate using Workload Identity Federation (recommended)
+      - name: Azure Login (Federated Credentials)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Install Power Platform CLI
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      - name: Create PAC auth profile
+        shell: pwsh
+        run: |
+          pac auth create --environment "${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}" --name "deploy-profile"
+
+      - name: Check for deployment settings
+        id: settings
+        shell: pwsh
+        run: |
+          $settingsFile = "./settings/${{ matrix.solution }}_prod.json"
+          if (Test-Path $settingsFile) {
+              Write-Host "Found deployment settings: $settingsFile"
+              echo "settings_file=$settingsFile" >> $env:GITHUB_OUTPUT
+              echo "has_settings=true" >> $env:GITHUB_OUTPUT
+          } else {
+              Write-Host "No deployment settings found for prod environment"
+              echo "has_settings=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Import solution to Production
+        shell: pwsh
+        run: |
+          $importArgs = @(
+            "--path", "${{ runner.temp }}/artifacts/${{ matrix.solution }}_managed.zip",
+            "--force-overwrite",
+            "--publish-changes",
+            "--async"
+          )
+          
+          if ("${{ steps.settings.outputs.has_settings }}" -eq "true") {
+              $importArgs += "--settings-file"
+              $importArgs += "${{ steps.settings.outputs.settings_file }}"
+              Write-Host "Importing with deployment settings..."
+          }
+          
+          pac solution import @importArgs
+
+      - name: Deployment summary
+        shell: pwsh
+        run: |
+          Write-Host "✅ Successfully deployed ${{ matrix.solution }} to Production"
+          Write-Host "Environment: ${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}"
