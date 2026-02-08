@@ -1,0 +1,235 @@
+# Build and Deploy Solution Pipeline (Azure DevOps)
+# Builds solutions from source and deploys to target environments.
+#
+# Trigger: Push to main (solutions/ or settings/ paths)
+# Also supports manual runs with environment selection.
+#
+# See docs/azure-devops-setup.md for setup instructions.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - solutions/*
+      - settings/*
+
+variables:
+  - template: environment-variables.yml
+
+parameters:
+  # ──────────────────────────────────────────────────────
+  # Solutions to build/deploy (add your solutions here)
+  # ──────────────────────────────────────────────────────
+  - name: solutions
+    type: object
+    displayName: "Solutions to deploy"
+    default:
+      - solutionName: "YourSolutionName"
+        displayName: "Your Solution"
+        dependsOnSolutions: []
+        useDeploymentSettingsFile: true
+
+  # ──────────────────────────────────────────────────────
+  # Target environments
+  # ──────────────────────────────────────────────────────
+  - name: targetEnvironments
+    type: object
+    displayName: "Target environments"
+    default:
+      - environmentName: "test"
+        displayName: "Test"
+        environmentUrl: "https://yourorg-test.crm.dynamics.com"
+        serviceConnectionName: "your-powerplatform-test-connection"
+      - environmentName: "prod"
+        displayName: "Production"
+        environmentUrl: "https://yourorg-prod.crm.dynamics.com"
+        serviceConnectionName: "your-powerplatform-prod-connection"
+
+  # ──────────────────────────────────────────────────────
+  # Deployment options
+  # ──────────────────────────────────────────────────────
+  - name: convertToManaged
+    displayName: "Deploy as managed solution"
+    type: boolean
+    default: true
+  - name: overwriteUnmanagedCustomizations
+    displayName: "Overwrite unmanaged customizations"
+    type: boolean
+    default: false
+  - name: stageAndUpgrade
+    displayName: "Use Stage and Upgrade"
+    type: boolean
+    default: true
+
+pool:
+  vmImage: "windows-latest"
+
+stages:
+  # ═══════════════════════════════════════════════════════
+  # Stage 1: Build all solutions
+  # ═══════════════════════════════════════════════════════
+  - stage: Build
+    displayName: "Build Solutions"
+    jobs:
+      - ${{ each solution in parameters.solutions }}:
+          - job: Build_${{ replace(solution.solutionName, '-', '_') }}
+            displayName: "Build ${{ solution.displayName }}"
+            steps:
+              - checkout: self
+
+              - task: PowerShell@2
+                displayName: "Extract solution version"
+                inputs:
+                  targetType: inline
+                  script: |
+                    $solutionXmlPath = "$(Build.SourcesDirectory)/$(solutionRootFolder)/${{ solution.solutionName }}/Other/Solution.xml"
+                    if (-not (Test-Path $solutionXmlPath)) {
+                      Write-Error "Solution.xml not found at $solutionXmlPath"
+                      exit 1
+                    }
+                    [xml]$xml = Get-Content $solutionXmlPath
+                    $version = $xml.ImportExportXml.SolutionManifest.Version
+                    if (-not $version) { $version = "0.0.0.0" }
+                    Write-Host "Solution version: $version"
+                    Write-Host "##vso[task.setvariable variable=SOLUTION_VERSION]$version"
+
+              - task: PowerPlatformToolInstaller@2
+                displayName: "Install Power Platform CLI"
+                inputs:
+                  DefaultVersion: true
+                  AddToolsToPath: true
+
+              # Pack as Managed
+              - task: PowerPlatformPackSolution@2
+                displayName: "Pack solution (Managed)"
+                condition: eq('${{ parameters.convertToManaged }}', true)
+                inputs:
+                  SolutionSourceFolder: "$(Build.SourcesDirectory)/$(solutionRootFolder)/${{ solution.solutionName }}"
+                  SolutionOutputFile: "$(Build.ArtifactStagingDirectory)/${{ solution.solutionName }}_managed.zip"
+                  SolutionType: Managed
+
+              # Pack as Unmanaged
+              - task: PowerPlatformPackSolution@2
+                displayName: "Pack solution (Unmanaged)"
+                condition: ne('${{ parameters.convertToManaged }}', true)
+                inputs:
+                  SolutionSourceFolder: "$(Build.SourcesDirectory)/$(solutionRootFolder)/${{ solution.solutionName }}"
+                  SolutionOutputFile: "$(Build.ArtifactStagingDirectory)/${{ solution.solutionName }}_unmanaged.zip"
+                  SolutionType: Unmanaged
+
+              # Copy settings files for downstream stages
+              - task: CopyFiles@2
+                displayName: "Copy settings files"
+                inputs:
+                  SourceFolder: "$(Build.SourcesDirectory)/settings"
+                  Contents: "${{ solution.solutionName }}*.json"
+                  TargetFolder: "$(Build.ArtifactStagingDirectory)/settings"
+                continueOnError: true
+
+              - task: PublishPipelineArtifact@1
+                displayName: "Publish artifact"
+                inputs:
+                  targetPath: "$(Build.ArtifactStagingDirectory)"
+                  artifactName: "${{ solution.solutionName }}-$(SOLUTION_VERSION)"
+
+  # ═══════════════════════════════════════════════════════
+  # Stage 2+: Deploy to each environment
+  # ═══════════════════════════════════════════════════════
+  - ${{ each env in parameters.targetEnvironments }}:
+      - stage: Deploy_${{ env.environmentName }}
+        displayName: "Deploy to ${{ env.displayName }}"
+        dependsOn:
+          - Build
+          # Production depends on test (if test is the first environment)
+          - ${{ if ne(env.environmentName, parameters.targetEnvironments[0].environmentName) }}:
+              - Deploy_${{ parameters.targetEnvironments[0].environmentName }}
+        condition: succeeded()
+
+        jobs:
+          - ${{ each solution in parameters.solutions }}:
+              - deployment: Deploy_${{ replace(solution.solutionName, '-', '_') }}
+                displayName: "Deploy ${{ solution.displayName }}"
+                environment: "${{ env.environmentName }}"
+                dependsOn:
+                  - ${{ each dep in solution.dependsOnSolutions }}:
+                      - Deploy_${{ replace(dep, '-', '_') }}
+                strategy:
+                  runOnce:
+                    deploy:
+                      steps:
+                        - task: PowerPlatformToolInstaller@2
+                          displayName: "Install Power Platform CLI"
+                          inputs:
+                            DefaultVersion: true
+                            AddToolsToPath: true
+
+                        # Determine solution package path
+                        - powershell: |
+                            $suffix = if ("${{ parameters.convertToManaged }}" -eq "True") { "_managed" } else { "_unmanaged" }
+                            $artifactPath = "$(Pipeline.Workspace)/${{ solution.solutionName }}-*/${{ solution.solutionName }}$suffix.zip"
+                            $resolved = Get-Item $artifactPath -ErrorAction SilentlyContinue | Select-Object -First 1
+                            if ($resolved) {
+                              Write-Host "Found solution: $($resolved.FullName)"
+                              Write-Host "##vso[task.setvariable variable=SOLUTION_ZIP]$($resolved.FullName)"
+                            } else {
+                              Write-Error "Solution artifact not found matching: $artifactPath"
+                              exit 1
+                            }
+                          displayName: "Resolve artifact path"
+
+                        # Check for deployment settings
+                        - powershell: |
+                            $settingsPath = "$(Pipeline.Workspace)/${{ solution.solutionName }}-*/settings/${{ solution.solutionName }}_${{ env.environmentName }}.json"
+                            $resolved = Get-Item $settingsPath -ErrorAction SilentlyContinue | Select-Object -First 1
+                            if ($resolved) {
+                              Write-Host "Found settings: $($resolved.FullName)"
+                              Write-Host "##vso[task.setvariable variable=SETTINGS_FILE]$($resolved.FullName)"
+                              Write-Host "##vso[task.setvariable variable=HAS_SETTINGS]true"
+                            } else {
+                              Write-Host "No deployment settings found for ${{ env.environmentName }}"
+                              Write-Host "##vso[task.setvariable variable=HAS_SETTINGS]false"
+                            }
+                          displayName: "Check for deployment settings"
+
+                        # Import solution (with settings)
+                        - task: PowerPlatformImportSolution@2
+                          displayName: "Import to ${{ env.displayName }}"
+                          condition: eq(variables['HAS_SETTINGS'], 'true')
+                          inputs:
+                            authenticationType: PowerPlatformSPN
+                            PowerPlatformSPN: "${{ env.serviceConnectionName }}"
+                            Environment: "${{ env.environmentUrl }}"
+                            SolutionInputFile: "$(SOLUTION_ZIP)"
+                            OverwriteUnmanagedCustomizations: ${{ parameters.overwriteUnmanagedCustomizations }}
+                            ConvertToManaged: ${{ parameters.convertToManaged }}
+                            StageAndUpgrade: ${{ parameters.stageAndUpgrade }}
+                            AsyncOperation: true
+                            MaxAsyncWaitTime: $(maxAsyncWaitTime)
+                            PublishWorkflows: true
+                            PublishCustomizationChanges: true
+                            UseDeploymentSettingsFile: true
+                            DeploymentSettingsFile: "$(SETTINGS_FILE)"
+
+                        # Import solution (without settings)
+                        - task: PowerPlatformImportSolution@2
+                          displayName: "Import to ${{ env.displayName }}"
+                          condition: ne(variables['HAS_SETTINGS'], 'true')
+                          inputs:
+                            authenticationType: PowerPlatformSPN
+                            PowerPlatformSPN: "${{ env.serviceConnectionName }}"
+                            Environment: "${{ env.environmentUrl }}"
+                            SolutionInputFile: "$(SOLUTION_ZIP)"
+                            OverwriteUnmanagedCustomizations: ${{ parameters.overwriteUnmanagedCustomizations }}
+                            ConvertToManaged: ${{ parameters.convertToManaged }}
+                            StageAndUpgrade: ${{ parameters.stageAndUpgrade }}
+                            AsyncOperation: true
+                            MaxAsyncWaitTime: $(maxAsyncWaitTime)
+                            PublishWorkflows: true
+                            PublishCustomizationChanges: true
+
+                        - powershell: |
+                            Write-Host "✅ Successfully deployed ${{ solution.solutionName }} to ${{ env.displayName }}"
+                            Write-Host "Environment: ${{ env.environmentUrl }}"
+                          displayName: "Deployment summary"

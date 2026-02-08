@@ -120,9 +120,9 @@ Connection references allow you to:
 3. Select your connection
 4. Copy the ID from the URL
 
-## Using Settings in Workflows
+## Using Settings in Pipelines
 
-### Build and Deploy Workflow
+### GitHub Actions
 
 The workflow automatically looks for settings files:
 
@@ -136,17 +136,30 @@ The workflow automatically looks for settings files:
     deployment-settings-file: ./settings/YourSolution_prod.json
 ```
 
-### Manual Override
+### Azure DevOps
 
-You can also pass settings directly:
+The pipeline uses Power Platform tasks with settings files:
 
 ```yaml
-- name: Import with inline settings
-  run: |
-    pac solution import \
-      --path ./solution.zip \
-      --environment ${{ vars.PROD_ENVIRONMENT_URL }} \
-      --settings-file ./settings/YourSolution_prod.json
+- task: PowerPlatformImportSolution@2
+  displayName: "Import solution"
+  inputs:
+    authenticationType: PowerPlatformSPN
+    PowerPlatformSPN: "powerplatform-prod"
+    SolutionInputFile: "$(Pipeline.Workspace)/solution/YourSolution.zip"
+    UseDeploymentSettingsFile: true
+    DeploymentSettingsFile: "$(Pipeline.Workspace)/solution/settings/YourSolution_prod.json"
+```
+
+### Manual Override (CLI)
+
+You can also import with settings directly using the Power Platform CLI:
+
+```shell
+pac solution import \
+  --path ./solution.zip \
+  --environment https://yourorg-prod.crm.dynamics.com \
+  --settings-file ./settings/YourSolution_prod.json
 ```
 
 ## Multi-Environment Strategy
@@ -172,33 +185,75 @@ Test
 Prod
 ```
 
-## GitHub Environment Configuration
+## CI/CD Platform Configuration
 
-### Setting Up Environments
+### GitHub Environments
 
 1. Go to **Settings > Environments**
 2. Create environments: `test`, `prod`
 3. Add environment-specific variables
 
-### Environment Variables vs Secrets
+#### Environment Variables vs Secrets
 
 | Type | Use For | Example |
 |------|---------|---------|
 | Variables | Non-sensitive config | Environment URLs |
 | Secrets | Sensitive data | Client secrets, API keys |
 
-### Protection Rules
+#### Protection Rules
 
 For production:
-1. **Required reviewers** - Require approval before deployment
-2. **Wait timer** - Add delay for manual intervention
-3. **Deployment branches** - Only allow from `main`
+1. **Required reviewers** – Require approval before deployment
+2. **Wait timer** – Add delay for manual intervention
+3. **Deployment branches** – Only allow from `main`
+
+### Azure DevOps Environments
+
+1. Go to **Pipelines > Environments**
+2. Create environments: `test`, `prod`
+3. Add approvals and checks
+
+#### Pipeline Variables
+
+Configure environment-specific values in `.pipelines/environment-variables.yml`:
+
+```yaml
+variables:
+  - name: authorEnvironmentUrl
+    value: "https://yourorg-dev.crm.dynamics.com"
+  - name: authorServiceConnection
+    value: "powerplatform-dev"
+```
+
+Target environments are defined as parameters in `.pipelines/build-and-deploy.yml`:
+
+```yaml
+parameters:
+  - name: targetEnvironments
+    type: object
+    default:
+      - environmentName: "test"
+        environmentUrl: "https://yourorg-test.crm.dynamics.com"
+        serviceConnectionName: "powerplatform-test"
+      - environmentName: "prod"
+        environmentUrl: "https://yourorg-prod.crm.dynamics.com"
+        serviceConnectionName: "powerplatform-prod"
+```
+
+#### Approvals and Checks
+
+For production:
+1. **Approvals** – Require one or more reviewers before deployment
+2. **Business hours** – Only allow deployments during working hours
+3. **Exclusive lock** – Prevent concurrent deployments to the same environment
 
 ## Advanced Configuration
 
 ### Dynamic Settings
 
 Generate settings at deploy time:
+
+#### GitHub Actions
 
 ```yaml
 - name: Generate settings
@@ -215,9 +270,30 @@ Generate settings at deploy time:
     $settings | ConvertTo-Json -Depth 10 | Out-File ./settings/dynamic.json
 ```
 
+#### Azure DevOps
+
+```yaml
+- task: PowerShell@2
+  displayName: "Generate dynamic settings"
+  inputs:
+    targetType: inline
+    script: |
+      $settings = @{
+        EnvironmentVariables = @(
+          @{
+            SchemaName = "yoursolution_DeployedAt"
+            Value = (Get-Date -Format "o")
+          }
+        )
+      }
+      $settings | ConvertTo-Json -Depth 10 | Out-File "$(Build.ArtifactStagingDirectory)/dynamic.json"
+```
+
 ### Secrets in Settings
 
-For sensitive values, use GitHub secrets:
+For sensitive values, use platform secrets:
+
+#### GitHub Actions
 
 ```yaml
 - name: Create settings with secrets
@@ -235,6 +311,29 @@ For sensitive values, use GitHub secrets:
     }
     $settings | ConvertTo-Json | Out-File ./settings/secure.json
 ```
+
+#### Azure DevOps
+
+```yaml
+- task: PowerShell@2
+  displayName: "Create settings with secrets"
+  inputs:
+    targetType: inline
+    script: |
+      $settings = @{
+        EnvironmentVariables = @(
+          @{
+            SchemaName = "yoursolution_APIKey"
+            Value = "$(ExternalApiKey)"
+          }
+        )
+      }
+      $settings | ConvertTo-Json | Out-File "$(Build.ArtifactStagingDirectory)/secure.json"
+  env:
+    ExternalApiKey: $(ExternalApiKey)
+```
+
+> 💡 **Tip**: In Azure DevOps, store secrets in **variable groups** linked to Azure Key Vault for automatic rotation.
 
 ## Troubleshooting
 
@@ -319,10 +418,11 @@ After deploying to a new environment for the first time:
 
 ### Automating Post-Deployment Tasks
 
-While some tasks are manual, you can automate reminders:
+While some tasks are manual, you can automate reminders in your CI/CD pipeline:
+
+#### GitHub Actions
 
 ```yaml
-# In your workflow, add a summary comment
 - name: Post-deployment reminder
   if: success()
   run: |
@@ -333,4 +433,21 @@ While some tasks are manual, you can automate reminders:
     echo "- [ ] Verify connections are working" >> $GITHUB_STEP_SUMMARY
     echo "- [ ] Test agent in target environment" >> $GITHUB_STEP_SUMMARY
     echo "- [ ] Publish agent if not auto-published" >> $GITHUB_STEP_SUMMARY
+```
+
+#### Azure DevOps
+
+```yaml
+- task: PowerShell@2
+  displayName: "Post-deployment reminder"
+  condition: succeeded()
+  inputs:
+    targetType: inline
+    script: |
+      Write-Host "##[section]Deployment Complete"
+      Write-Host "##[warning]Manual steps required:"
+      Write-Host "  - Configure Application Insights"
+      Write-Host "  - Verify connections are working"
+      Write-Host "  - Test agent in target environment"
+      Write-Host "  - Publish agent if not auto-published"
 ```

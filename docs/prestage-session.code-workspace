@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../oap-run-pipelines"
+		},
+		{
+			"path": "../../oap-svc-bizapps-1"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {}
+}

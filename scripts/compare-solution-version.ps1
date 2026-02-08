@@ -161,4 +161,23 @@ if ($env:GITHUB_OUTPUT) {
     "has_missing_dependencies=$($missingDependencies.Count -gt 0)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 }
 
+# Azure DevOps Pipelines output
+if ($env:TF_BUILD) {
+    Write-Host "##vso[task.setvariable variable=SHOULD_CREATE_PR]$shouldCreatePR"
+    Write-Host "##vso[task.setvariable variable=VERSION_COMPARISON_REASON]$versionComparisonReason"
+    Write-Host "##vso[task.setvariable variable=IS_NEW_SOLUTION]$isNewSolution"
+    Write-Host "##vso[task.setvariable variable=HAS_MISSING_DEPENDENCIES]$($missingDependencies.Count -gt 0)"
+
+    # Base64 encode missing dependencies for PR description
+    if ($missingDependencies.Count -gt 0) {
+        $depMsg = "## Missing Dependencies`n`n| Required Component | Solution | Dependent Type | Dependent Component |`n|---|---|---|---|`n"
+        foreach ($dep in $missingDependencies) {
+            $depMsg += "| $($dep.RequiredComponent) | $($dep.RequiredSolution) | $($dep.DependentType) | $($dep.DependentComponent) |`n"
+        }
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($depMsg)
+        $encoded = [Convert]::ToBase64String($bytes)
+        Write-Host "##vso[task.setvariable variable=MISSING_DEPENDENCIES]$encoded"
+    }
+}
+
 return $result

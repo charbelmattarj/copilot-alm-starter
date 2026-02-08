@@ -45,12 +45,20 @@ if (Test-Path $solutionXml) {
         "solution_description=$description" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
     }
     
-    # Output for environment variables
+    # Output for environment variables (GitHub Actions)
     if ($env:GITHUB_ENV) {
         "SOLUTION_NAME=$uniqueName" | Out-File -FilePath $env:GITHUB_ENV -Append
         "SOLUTION_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
         "SOLUTION_PUBLISHER=$publisher" | Out-File -FilePath $env:GITHUB_ENV -Append
         "SOLUTION_DESCRIPTION=$description" | Out-File -FilePath $env:GITHUB_ENV -Append
+    }
+
+    # Output for Azure DevOps Pipelines
+    if ($env:TF_BUILD) {
+        Write-Host "##vso[task.setvariable variable=SOLUTION_NAME]$uniqueName"
+        Write-Host "##vso[task.setvariable variable=SOLUTION_VERSION]$version"
+        Write-Host "##vso[task.setvariable variable=SOLUTION_PUBLISHER]$publisher"
+        Write-Host "##vso[task.setvariable variable=SOLUTION_DESCRIPTION]$description"
     }
     
     # Return as object for local use

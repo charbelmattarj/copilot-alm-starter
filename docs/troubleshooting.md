@@ -19,18 +19,24 @@ Common issues and their solutions when working with Power Platform ALM.
 
 **Cause:** The client secret has expired or is incorrect.
 
-**Solution:**
+**Solution (GitHub Actions):**
 1. Create a new client secret in your App Registration
 2. Update the `POWERPLATFORM_CLIENT_SECRET` GitHub secret
 3. Re-run the workflow
 
+**Solution (Azure DevOps):**
+1. Create a new client secret in your App Registration
+2. Go to **Project Settings > Service connections**
+3. Edit the affected service connection and update the secret
+4. Re-run the pipeline
+
 ### "Tenant ID mismatch"
 
-**Cause:** The tenant ID in GitHub secrets doesn't match the Power Platform tenant.
+**Cause:** The tenant ID doesn't match the Power Platform tenant.
 
-**Solution:**
-1. Verify your tenant ID in the identity provider portal
-2. Update `POWERPLATFORM_TENANT_ID` in GitHub secrets
+**Solution (GitHub Actions):** Update `AZURE_TENANT_ID` in repository variables.
+
+**Solution (Azure DevOps):** Update the tenant ID in the service connection.
 
 ## Export Issues
 
@@ -119,18 +125,20 @@ The version should be in format `X.X.X.X` (e.g., `1.0.0.0`)
 2. Update the `<Version>` element
 3. Commit and retry
 
-## Workflow Issues
+## CI/CD Pipeline Issues
 
-### "Workflow failed: permission denied"
+### GitHub Actions
+
+#### "Workflow failed: permission denied"
 
 **Cause:** GitHub Actions doesn't have required permissions.
 
 **Solution:**
 1. Check workflow has `contents: write` and `pull-requests: write`
-2. Verify GitHub secrets are correctly configured
+2. Verify GitHub secrets/variables are correctly configured
 3. Check repository settings allow Actions
 
-### "Branch protection preventing push"
+#### "Branch protection preventing push"
 
 **Cause:** Branch rules prevent direct pushes.
 
@@ -139,7 +147,7 @@ The version should be in format `X.X.X.X` (e.g., `1.0.0.0`)
 2. Ensure the workflow has permission to create branches
 3. Review branch protection settings
 
-### "Artifact not found"
+#### "Artifact not found"
 
 **Cause:** Build and deploy jobs not properly linked.
 
@@ -148,16 +156,68 @@ The version should be in format `X.X.X.X` (e.g., `1.0.0.0`)
 2. Check artifact names match between upload and download
 3. Ensure build job completed successfully
 
+### Azure DevOps
+
+#### "Pipeline not triggered on PR"
+
+**Cause:** Branch policies or PR triggers are not configured.
+
+**Solution:**
+1. Verify **Build validation** policy is set on the `main` branch
+2. Check the pipeline YAML has correct `pr` trigger paths
+3. Ensure the pipeline is enabled and not paused
+
+#### "Could not find service connection"
+
+**Cause:** Service connection name mismatch.
+
+**Solution:**
+1. Go to **Project Settings > Service connections**
+2. Verify the exact name (case-sensitive)
+3. Ensure the pipeline is authorized to use it
+
+#### "The pipeline is not valid" or tasks not found
+
+**Cause:** Power Platform Build Tools extension not installed.
+
+**Solution:**
+Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=microsoft-IsvExpTools.PowerPlatform-BuildTools).
+
+#### "PR creation failed (REST API 403)"
+
+**Cause:** Build Service doesn't have permission to create pull requests.
+
+**Solution:**
+1. Go to **Project Settings > Repositories > Security**
+2. Grant the Build Service identity:
+   - **Contribute**
+   - **Contribute to pull requests**
+   - **Create branch**
+
+#### "No hosted parallelism has been purchased"
+
+**Cause:** Azure DevOps free tier has limited parallel jobs.
+
+**Solution:**
+1. Go to **Organization Settings > Pipelines > Parallel jobs**
+2. Request free parallelism grant (for public/open-source projects) or purchase
+3. Alternatively, set up a self-hosted agent
+
 ## Environment Issues
 
 ### "Environment URL not found"
 
-**Cause:** Environment variable not configured in GitHub.
+**Cause:** Environment variable not configured.
 
-**Solution:**
-1. Go to Settings > Environments
+**Solution (GitHub Actions):**
+1. Go to **Settings > Environments**
 2. Select your environment (test/prod)
-3. Add the `TEST_ENVIRONMENT_URL` or `PROD_ENVIRONMENT_URL` variable
+3. Add the `POWERPLATFORM_ENVIRONMENT_URL` variable
+
+**Solution (Azure DevOps):**
+1. Check `.pipelines/environment-variables.yml` for the author URL
+2. Check the `targetEnvironments` parameter in `.pipelines/build-and-deploy.yml`
+3. Verify service connection URLs match the actual environment
 
 ### "Connection reference not mapped"
 
@@ -238,11 +298,17 @@ Application Insights configuration doesn't transfer with solution deployments:
 
 ### Enable Verbose Logging
 
-Add to your workflow:
-
+**GitHub Actions** – Add to your workflow:
 ```yaml
 env:
   ACTIONS_STEP_DEBUG: true
+```
+
+**Azure DevOps** – Add to your pipeline:
+```yaml
+variables:
+  - name: System.Debug
+    value: true
 ```
 
 ### Check Power Platform Logs
@@ -266,7 +332,7 @@ pac solution pack --zipfile ./test.zip --folder ./solutions/YourSolution
 
 ## Getting More Help
 
-1. **Check GitHub Actions logs** - Detailed step-by-step output
-2. **Review Power Platform admin center** - Import/export history
-3. **Search existing issues** - Someone may have solved it
-4. **Open a new issue** - Include error messages and steps to reproduce
+1. **Check CI/CD logs** – Detailed step-by-step output in GitHub Actions or Azure DevOps
+2. **Review Power Platform admin center** – Import/export history
+3. **Search existing issues** – Someone may have solved it
+4. **Open a new issue** – Include error messages and steps to reproduce

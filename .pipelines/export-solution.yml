@@ -1,0 +1,204 @@
+# Export Solution Pipeline (Azure DevOps)
+# Exports a Power Platform solution from the development environment
+# and creates a pull request with the changes.
+#
+# Trigger: Manual (Run pipeline)
+# See docs/azure-devops-setup.md for setup instructions.
+
+trigger: none
+
+variables:
+  - template: environment-variables.yml
+
+parameters:
+  - name: solutionName
+    type: string
+    displayName: "Solution unique name to export"
+
+  - name: environmentUrl
+    type: string
+    displayName: "Source environment URL (leave empty to use default)"
+    default: ""
+
+  - name: targetBranch
+    type: string
+    displayName: "Target branch for the PR"
+    default: "main"
+
+pool:
+  vmImage: "windows-latest"
+
+jobs:
+  - job: ExportSolution
+    displayName: "Export ${{ parameters.solutionName }}"
+    timeoutInMinutes: 60
+
+    steps:
+      - checkout: self
+        persistCredentials: true
+        fetchDepth: 0
+
+      # Resolve environment URL (parameter override or default from variables)
+      - powershell: |
+          $envUrl = "${{ parameters.environmentUrl }}"
+          if ([string]::IsNullOrWhiteSpace($envUrl)) {
+            $envUrl = "$(authorEnvironmentUrl)"
+          }
+          Write-Host "Using environment: $envUrl"
+          Write-Host "##vso[task.setvariable variable=RESOLVED_ENV_URL]$envUrl"
+        displayName: "Resolve environment URL"
+
+      - task: PowerPlatformToolInstaller@2
+        displayName: "Install Power Platform CLI"
+        inputs:
+          DefaultVersion: true
+          AddToolsToPath: true
+
+      - task: PowerPlatformWhoAmi@2
+        displayName: "Verify connection"
+        inputs:
+          authenticationType: PowerPlatformSPN
+          PowerPlatformSPN: "$(authorServiceConnection)"
+          Environment: "$(RESOLVED_ENV_URL)"
+
+      - task: PowerPlatformExportSolution@2
+        displayName: "Export ${{ parameters.solutionName }} (Unmanaged)"
+        inputs:
+          authenticationType: PowerPlatformSPN
+          PowerPlatformSPN: "$(authorServiceConnection)"
+          Environment: "$(RESOLVED_ENV_URL)"
+          SolutionName: "${{ parameters.solutionName }}"
+          Managed: false
+          SolutionOutputFile: "$(Build.ArtifactStagingDirectory)/${{ parameters.solutionName }}.zip"
+          Overwrite: true
+
+      - task: PowerPlatformUnpackSolution@2
+        displayName: "Unpack solution"
+        inputs:
+          SolutionInputFile: "$(Build.ArtifactStagingDirectory)/${{ parameters.solutionName }}.zip"
+          SolutionTargetFolder: "$(Build.SourcesDirectory)/$(solutionRootFolder)/${{ parameters.solutionName }}"
+          SolutionType: Unmanaged
+
+      # Set Managed=2 (Both) so solution can be packed as managed or unmanaged later
+      - powershell: |
+          $solutionXmlPath = "$(Build.SourcesDirectory)/$(solutionRootFolder)/${{ parameters.solutionName }}/Other/Solution.xml"
+          if (-not (Test-Path $solutionXmlPath)) {
+            Write-Warning "Solution.xml not found - skipping Managed update"
+            exit 0
+          }
+          try {
+            [xml]$xml = Get-Content $solutionXmlPath -ErrorAction Stop
+            $managedNode = $xml.ImportExportXml.SolutionManifest.SelectSingleNode("Managed")
+            if ($managedNode) {
+              $managedNode.InnerText = "2"
+              $xml.Save($solutionXmlPath)
+              Write-Host "Updated Managed to 2 (Both)"
+            }
+          } catch {
+            Write-Warning "Failed to update Managed: $($_.Exception.Message)"
+          }
+        displayName: "Set Managed to 2 (Both)"
+        continueOnError: true
+
+      # Extract solution metadata
+      - task: PowerShell@2
+        displayName: "Extract solution metadata"
+        env:
+          SOLUTION_FOLDER: "$(solutionRootFolder)/${{ parameters.solutionName }}"
+        inputs:
+          targetType: filePath
+          filePath: "$(Build.SourcesDirectory)/scripts/extract-solution-metadata.ps1"
+          workingDirectory: "$(Build.SourcesDirectory)"
+
+      # Compare solution version with target branch
+      - task: PowerShell@2
+        displayName: "Compare solution version"
+        env:
+          SOLUTION_FOLDER: "$(solutionRootFolder)/${{ parameters.solutionName }}"
+          SOLUTION_NAME: "${{ parameters.solutionName }}"
+          TARGET_BRANCH: "${{ parameters.targetBranch }}"
+        inputs:
+          targetType: filePath
+          filePath: "$(Build.SourcesDirectory)/scripts/compare-solution-version.ps1"
+          workingDirectory: "$(Build.SourcesDirectory)"
+
+      # Generate deployment settings template
+      - powershell: |
+          $settingsDir = "$(Build.SourcesDirectory)/settings"
+          New-Item -ItemType Directory -Force -Path $settingsDir | Out-Null
+          $settingsFile = "$settingsDir/${{ parameters.solutionName }}.settings.json"
+          if (-not (Test-Path $settingsFile)) {
+            pac solution create-settings `
+              --solution-zip "$(Build.ArtifactStagingDirectory)/${{ parameters.solutionName }}.zip" `
+              --settings-file "$settingsFile"
+            Write-Host "Created settings template: $settingsFile"
+          } else {
+            Write-Host "Settings file already exists: $settingsFile"
+          }
+        displayName: "Generate deployment settings template"
+
+      # Commit, push, and create PR
+      - powershell: |
+          $version = "$(SOLUTION_VERSION)"
+          $branchName = "solution/${{ parameters.solutionName }}-v$version"
+
+          git config user.name "Azure DevOps Pipeline"
+          git config user.email "pipeline@dev.azure.com"
+
+          # Check for changes
+          git add -A
+          $changes = git diff --cached --name-only
+          if (-not $changes) {
+            Write-Host "No changes detected - skipping PR creation"
+            exit 0
+          }
+
+          Write-Host "Changes detected:"
+          $changes | ForEach-Object { Write-Host "  - $_" }
+
+          # Create or switch to branch
+          $branchExists = git ls-remote --heads origin $branchName
+          if ($branchExists) {
+            git checkout $branchName
+            git pull origin $branchName
+            git add -A
+          } else {
+            git checkout -b $branchName
+          }
+
+          git commit -m "chore: export ${{ parameters.solutionName }} v$version"
+          git push origin $branchName
+
+          # Create PR via Azure DevOps REST API
+          $orgUrl = "$(System.CollectionUri)"
+          $projectId = "$(System.TeamProjectId)"
+          $repoId = "$(Build.Repository.ID)"
+          $token = "$(System.AccessToken)"
+
+          $headers = @{
+            Authorization  = "Bearer $token"
+            "Content-Type" = "application/json"
+          }
+
+          # Check for existing PR
+          $prsUrl = "${orgUrl}${projectId}/_apis/git/repositories/${repoId}/pullrequests?searchCriteria.status=active&api-version=7.1-preview.1"
+          $existingPrs = (Invoke-RestMethod -Method Get -Uri $prsUrl -Headers $headers).value
+          $matchingPr = $existingPrs | Where-Object { $_.sourceRefName -eq "refs/heads/$branchName" }
+
+          if ($matchingPr) {
+            Write-Host "PR already exists: #$($matchingPr.pullRequestId)"
+          } else {
+            $body = @{
+              sourceRefName = "refs/heads/$branchName"
+              targetRefName = "refs/heads/${{ parameters.targetBranch }}"
+              title         = "🤖 Export: ${{ parameters.solutionName }} v$version"
+              description   = "## Solution Export`n`n**Solution:** ${{ parameters.solutionName }}`n**Version:** $version`n**Source:** $(RESOLVED_ENV_URL)`n`n### Checklist`n- [ ] Review solution components`n- [ ] Verify no unintended changes`n- [ ] Update deployment settings if needed"
+            } | ConvertTo-Json
+
+            $createUrl = "${orgUrl}${projectId}/_apis/git/repositories/${repoId}/pullrequests?api-version=7.1-preview.1"
+            $pr = Invoke-RestMethod -Method Post -Uri $createUrl -Headers $headers -Body $body
+            Write-Host "Created PR #$($pr.pullRequestId)"
+          }
+        displayName: "Commit, push, and create PR"
+        env:
+          SYSTEM_ACCESSTOKEN: $(System.AccessToken)

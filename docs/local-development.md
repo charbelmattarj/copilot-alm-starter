@@ -90,9 +90,9 @@ pac solution import \
 pwsh ./scripts/validate-solution.ps1 -SolutionFolder ./solutions/YourSolutionName
 ```
 
-## Testing Workflows Locally
+## Testing Pipelines Locally
 
-### Using act (GitHub Actions local runner)
+### Testing GitHub Actions with act
 
 ```bash
 # Install act
@@ -104,6 +104,19 @@ act workflow_dispatch \
   -W .github/workflows/validate-pr.yml \
   --input solution_name=YourSolution
 ```
+
+### Testing Azure DevOps Pipelines
+
+Azure DevOps doesn't have a direct local runner like `act`. Instead:
+
+1. **Test scripts independently** – Run the PowerShell scripts locally:
+   ```bash
+   pwsh ./scripts/validate-solution.ps1 -SolutionFolder ./solutions/YourSolution
+   pwsh ./scripts/extract-solution-metadata.ps1 -SolutionFolder ./solutions/YourSolution
+   ```
+2. **Test pack/unpack** – Use `pac` CLI directly (see commands above)
+3. **Push to a feature branch** – Create a PR to trigger the `validate-pr.yml` pipeline
+4. **Use pipeline YAML validation** – Install the [Azure Pipelines VS Code extension](https://marketplace.visualstudio.com/items?itemName=ms-azure-devops.azure-pipelines) for syntax checking
 
 ### Manual Testing Checklist
 
@@ -163,6 +176,7 @@ cat ./temp/Other/Solution.xml | grep -A 20 "MissingDependencies"
 
 Recommended VS Code extensions:
 
-- **Power Platform Tools** - Official extension for Power Platform development
-- **PowerShell** - For running scripts
-- **YAML** - For editing workflows
+- **Power Platform Tools** – Official extension for Power Platform development
+- **PowerShell** – For running scripts
+- **YAML** – For editing workflow and pipeline files
+- **Azure Pipelines** – Syntax highlighting and validation for Azure DevOps YAML pipelines
