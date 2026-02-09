@@ -23,38 +23,14 @@ This repository provides everything you need to implement Application Lifecycle 
 
 ## Repository Structure
 
-```
-├── .github/
-│   └── workflows/               # GitHub Actions workflows
-│       ├── export-solution.yml
-│       ├── build-and-deploy.yml
-│       └── validate-pr.yml
-├── .pipelines/                  # Azure DevOps pipelines
-│   ├── export-solution.yml
-│   ├── build-and-deploy.yml
-│   ├── validate-pr.yml
-│   └── environment-variables.yml
-├── docs/                        # Documentation and guides
-│   ├── getting-started.md
-│   ├── authentication.md
-│   ├── azure-devops-setup.md
-│   ├── building-agents.md
-│   ├── environment-configuration.md
-│   ├── local-development.md
-│   └── troubleshooting.md
-├── scripts/                     # Reusable PowerShell scripts (both platforms)
-│   ├── extract-solution-metadata.ps1
-│   ├── compare-solution-version.ps1
-│   └── validate-solution.ps1
-├── solutions/                   # Your Power Platform solutions (unpacked)
-│   └── <YourSolutionName>/
-│       ├── botcomponents/
-│       ├── bots/
-│       └── Other/
-└── settings/                    # Environment-specific deployment settings
-    ├── SolutionName_test.json
-    └── SolutionName_prod.json
-```
+| Folder | Description |
+|--------|-------------|
+| `.github/workflows/` | GitHub Actions workflows (export, build & deploy, PR validation) |
+| `.pipelines/` | Azure DevOps pipeline definitions and shared variables |
+| `docs/` | Documentation and step-by-step guides |
+| `scripts/` | Reusable PowerShell scripts (work across both CI/CD platforms) |
+| `solutions/` | Your Power Platform solutions (unpacked source) |
+| `settings/` | Environment-specific deployment settings (per solution, per environment) |
 
 ## Pipelines
 
