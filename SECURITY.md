@@ -1,42 +1,11 @@
-# Security Policy
+<!-- BEGIN MICROSOFT SECURITY.MD V1.0.0 BLOCK -->
 
-## Reporting a Vulnerability
+## Security
 
-If you discover a security vulnerability, please report it responsibly:
+Microsoft takes the security of our software products and services seriously, which includes all source code repositories in our GitHub organizations.
 
-1. **Do not** create a public GitHub issue
-2. Email details to the repository maintainers
-3. Include steps to reproduce the vulnerability
-4. Allow time for the issue to be addressed before disclosure
+**Please do not report security vulnerabilities through public GitHub issues.**
 
-## Security Best Practices
+For security reporting information, locations, contact information, and policies, please review the latest guidance for Microsoft repositories at [https://aka.ms/SECURITY.md](https://aka.ms/SECURITY.md).
 
-When using this repository:
-
-### Secrets Management
-
-- Never commit secrets to the repository
-- Use GitHub Secrets for sensitive values
-- Rotate credentials regularly
-- Use environment-specific secrets
-
-### Service Principal Security
-
-- Follow principle of least privilege
-- Use environment-level permissions when possible
-- Monitor service principal activity
-- Set appropriate secret expiration
-
-### Repository Security
-
-- Enable branch protection rules
-- Require PR reviews for main branch
-- Use environment protection rules
-- Enable security alerts
-
-## Supported Versions
-
-| Version | Supported          |
-| ------- | ------------------ |
-| Latest  | :white_check_mark: |
-| Older   | :x:                |
+<!-- END MICROSOFT SECURITY.MD BLOCK -->

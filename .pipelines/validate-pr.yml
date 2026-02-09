@@ -63,53 +63,16 @@ jobs:
           targetType: inline
           script: |
             $solutions = '$(detect.SOLUTIONS)' | ConvertFrom-Json
-            $errors = @()
 
             foreach ($solution in $solutions) {
               Write-Host "Validating: $solution"
               $solutionPath = "./$(solutionRootFolder)/$solution"
 
-              # Check Solution.xml exists
-              $solutionXml = "$solutionPath/Other/Solution.xml"
-              if (-not (Test-Path $solutionXml)) {
-                $errors += "❌ $solution : Missing Solution.xml"
-                continue
+              & "$(Build.SourcesDirectory)/scripts/validate-solution.ps1" -SolutionFolder $solutionPath
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "Validation failed for $solution"
+                exit 1
               }
-
-              # Parse Solution.xml
-              try {
-                [xml]$xml = Get-Content $solutionXml
-                $version = $xml.ImportExportXml.SolutionManifest.Version
-                $uniqueName = $xml.ImportExportXml.SolutionManifest.UniqueName
-
-                Write-Host "  ✅ Solution: $uniqueName"
-                Write-Host "  ✅ Version: $version"
-
-                # Validate version format
-                if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-                  $errors += "⚠️ $solution : Invalid version format: $version (expected x.x.x.x)"
-                }
-
-                # Check for missing dependencies
-                $missingDeps = $xml.ImportExportXml.SolutionManifest.MissingDependencies.MissingDependency
-                if ($missingDeps) {
-                  $count = if ($missingDeps -is [System.Array]) { $missingDeps.Count } else { 1 }
-                  $errors += "⚠️ $solution : Has $count missing dependencies"
-                }
-              } catch {
-                $errors += "❌ $solution : Failed to parse Solution.xml - $($_.Exception.Message)"
-              }
-            }
-
-            if ($errors.Count -gt 0) {
-              Write-Host "`n=== Validation Issues ===" -ForegroundColor Yellow
-              $errors | ForEach-Object { Write-Host $_ }
-
-              # Fail on critical errors (❌), warn on warnings (⚠️)
-              $criticalErrors = $errors | Where-Object { $_ -match '^❌' }
-              if ($criticalErrors.Count -gt 0) { exit 1 }
-            } else {
-              Write-Host "`n✅ All validations passed!" -ForegroundColor Green
             }
 
       - task: PowerShell@2

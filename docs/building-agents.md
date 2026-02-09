@@ -142,6 +142,21 @@ Increment version numbers meaningfully:
 2.0.0.0  - Breaking changes
 ```
 
+### 7. Managed vs Unmanaged Deployments
+
+The pipelines deploy **managed solutions** by default (`convertToManaged: true` / `deploy_as_managed: true`). This is the recommended approach for test and production environments.
+
+| Mode | Use Case | Behavior |
+|------|----------|----------|
+| **Managed** (default) | Test, Prod | Components are locked; clean uninstall is supported; prevents accidental edits |
+| **Unmanaged** | Dev only | Components are editable; used for active development |
+
+> ⚠️ **When to change**: Set `convertToManaged` to `false` only if you need to deploy to a shared development environment where makers will continue editing the solution. Never deploy unmanaged to production.
+
+**GitHub Actions**: Set `deploy_as_managed: false` when triggering the workflow.
+
+**Azure DevOps**: Set `convertToManaged: false` in the pipeline parameter when running manually, or change the default in `.pipelines/build-and-deploy.yml`.
+
 ## Working with Topics
 
 ### Topic File Structure
@@ -271,6 +286,6 @@ Deploy variations to test environments:
 
 ## Resources
 
-- [Copilot Studio Documentation](https://learn.microsoft.com/en-us/microsoft-copilot-studio/)
-- [Power Platform CLI Reference](https://learn.microsoft.com/en-us/power-platform/developer/cli/reference/)
-- [Solution Concepts](https://learn.microsoft.com/en-us/power-platform/alm/solution-concepts-alm)
+- [Copilot Studio Documentation](https://learn.microsoft.com/microsoft-copilot-studio/)
+- [Power Platform CLI Reference](https://learn.microsoft.com/power-platform/developer/cli/reference/)
+- [Solution Concepts](https://learn.microsoft.com/power-platform/alm/solution-concepts-alm)

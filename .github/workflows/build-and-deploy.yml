@@ -184,7 +184,7 @@ jobs:
             - name: Create PAC auth profile
               shell: pwsh
               run: |
-                  pac auth create --environment "${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}" --name "deploy-profile"
+                  pac auth create --environment "${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}" --name "deploy-profile" --managedIdentity
 
             - name: Check for deployment settings
               id: settings
@@ -203,11 +203,14 @@ jobs:
             - name: Import solution to Test
               shell: pwsh
               run: |
+                  $suffix = if ("${{ inputs.deploy_as_managed }}" -ne "false") { "_managed" } else { "_unmanaged" }
                   $importArgs = @(
-                    "--path", "${{ runner.temp }}/artifacts/${{ matrix.solution }}_managed.zip",
+                    "--path", "${{ runner.temp }}/artifacts/${{ matrix.solution }}$suffix.zip",
                     "--force-overwrite",
                     "--publish-changes",
-                    "--async"
+                    "--async",
+                    "--max-async-wait-time", "60",
+                    "--stage-and-upgrade"
                   )
 
                   if ("${{ steps.settings.outputs.has_settings }}" -eq "true") {
@@ -264,7 +267,7 @@ jobs:
             - name: Create PAC auth profile
               shell: pwsh
               run: |
-                  pac auth create --environment "${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}" --name "deploy-profile"
+                  pac auth create --environment "${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}" --name "deploy-profile" --managedIdentity
 
             - name: Check for deployment settings
               id: settings
@@ -283,11 +286,14 @@ jobs:
             - name: Import solution to Production
               shell: pwsh
               run: |
+                  $suffix = if ("${{ inputs.deploy_as_managed }}" -ne "false") { "_managed" } else { "_unmanaged" }
                   $importArgs = @(
-                    "--path", "${{ runner.temp }}/artifacts/${{ matrix.solution }}_managed.zip",
+                    "--path", "${{ runner.temp }}/artifacts/${{ matrix.solution }}$suffix.zip",
                     "--force-overwrite",
                     "--publish-changes",
-                    "--async"
+                    "--async",
+                    "--max-async-wait-time", "60",
+                    "--stage-and-upgrade"
                   )
 
                   if ("${{ steps.settings.outputs.has_settings }}" -eq "true") {

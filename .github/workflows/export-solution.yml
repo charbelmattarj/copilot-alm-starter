@@ -42,25 +42,25 @@ jobs:
 
         steps:
             - name: Checkout repository
-              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+              uses: actions/checkout@v4
               with:
                   fetch-depth: 0
 
             # Authenticate using Workload Identity Federation (recommended)
             - name: Azure Login (Federated Credentials)
-              uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+              uses: azure/login@v2
               with:
                   client-id: ${{ vars.AZURE_CLIENT_ID }}
                   tenant-id: ${{ vars.AZURE_TENANT_ID }}
                   allow-no-subscriptions: true
 
             - name: Install Power Platform CLI
-              uses: microsoft/powerplatform-actions/actions-install@latest
+              uses: microsoft/powerplatform-actions/actions-install@v1
 
             - name: Create PAC auth profile
               shell: pwsh
               run: |
-                  pac auth create --environment "${{ inputs.environment_url }}" --name "export-profile"
+                  pac auth create --environment "${{ inputs.environment_url }}" --name "export-profile" --managedIdentity
 
             - name: Verify connection
               shell: pwsh

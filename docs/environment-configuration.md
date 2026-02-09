@@ -13,7 +13,7 @@ Different environments (dev, test, prod) often need different configurations:
 
 ### File Structure
 
-Create settings files in the `settings/` folder:
+Create settings files in the `settings/` folder at the **root of your repository** (see [`settings/README.md`](../settings/README.md) for examples):
 
 ```
 settings/

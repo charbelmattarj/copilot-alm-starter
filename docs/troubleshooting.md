@@ -19,6 +19,8 @@ Common issues and their solutions when working with Power Platform ALM.
 
 **Cause:** The client secret has expired or is incorrect.
 
+> 💡 **Tip**: Switch to Workload Identity Federation to avoid client secret issues entirely. See [Authentication](authentication.md).
+
 **Solution (GitHub Actions):**
 1. Create a new client secret in your App Registration
 2. Update the `POWERPLATFORM_CLIENT_SECRET` GitHub secret

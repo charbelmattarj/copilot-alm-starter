@@ -28,7 +28,28 @@ The pipelines require the **Power Platform Build Tools** extension from the Visu
 
 Create a Power Platform service connection for each environment.
 
-### For Each Environment (dev, test, prod)
+### Recommended: Workload Identity Federation
+
+Workload Identity Federation (WIF) is the recommended authentication method. It eliminates client secrets entirely.
+
+For each environment (`dev`, `test`, `prod`):
+
+1. Go to **Project Settings > Service connections**
+2. Click **New service connection**
+3. Select **Power Platform**
+4. Choose **Workload Identity Federation (automatic)** as the authentication method
+5. Fill in:
+   - **Server URL**: Your environment URL (e.g., `https://yourorg-dev.crm.dynamics.com`)
+   - **Tenant ID**: Your Entra ID tenant ID
+   - **Application (client) ID**: From your App Registration
+   - **Service connection name**: Use a consistent naming convention (see table below)
+6. Click **Save**
+
+> 💡 If **automatic** is not available, choose **Workload Identity Federation (manual)** and add the federated credential to your App Registration in Entra ID. See [Authentication](authentication.md) for details.
+
+### Fallback: Client Secret
+
+If WIF is not available (e.g., Entra ID tenant not connected to Azure DevOps):
 
 1. Go to **Project Settings > Service connections**
 2. Click **New service connection**
@@ -39,6 +60,8 @@ Create a Power Platform service connection for each environment.
    - **Application (client) ID**: From your App Registration
    - **Client Secret**: Your App Registration client secret
    - **Service connection name**: Use a consistent naming convention
+
+> ⚠️ Client secrets expire (max 24 months). Set a calendar reminder to rotate before expiration.
 
 ### Recommended Naming Convention
 
@@ -118,7 +141,7 @@ variables:
   - name: solutionRootFolder
     value: "solutions"
   - name: maxAsyncWaitTime
-    value: "30"
+    value: 60
 ```
 
 ### 4b. Update Build and Deploy Parameters
@@ -131,15 +154,19 @@ parameters:
     type: object
     default:
       - solutionName: "YourSolution"
+        displayName: "Your Solution"
         dependsOnSolutions: []
+        useDeploymentSettingsFile: true
 
   - name: targetEnvironments
     type: object
     default:
       - environmentName: "test"
+        displayName: "Test"
         environmentUrl: "https://yourorg-test.crm.dynamics.com"
         serviceConnectionName: "powerplatform-test"
       - environmentName: "prod"
+        displayName: "Production"
         environmentUrl: "https://yourorg-prod.crm.dynamics.com"
         serviceConnectionName: "powerplatform-prod"
 ```

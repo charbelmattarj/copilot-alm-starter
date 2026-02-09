@@ -9,7 +9,7 @@ Both **GitHub Actions** and **Azure DevOps Pipelines** are supported. Choose the
 | Platform | Recommended Auth Method | Secret Management |
 |----------|------------------------|-------------------|
 | **GitHub Actions** | Workload Identity Federation (federated credentials) | No secrets to manage |
-| **Azure DevOps** | Power Platform Service Connection (SPN) | Client secret stored in service connection |
+| **Azure DevOps** | Workload Identity Federation (service connection) | No secrets to manage |
 
 Both approaches use a **Service Principal** (App Registration) under the hood.
 
@@ -142,23 +142,63 @@ jobs:
       - name: Authenticate to Power Platform
         shell: pwsh
         run: |
-          pac auth create --environment ${{ vars.POWERPLATFORM_ENVIRONMENT_URL }}
+          pac auth create --environment ${{ vars.POWERPLATFORM_ENVIRONMENT_URL }} --managedIdentity
 ```
+
+> 💡 The `--managedIdentity` flag tells `pac` to use [DefaultAzureCredential](https://learn.microsoft.com/dotnet/azure/sdk/authentication/credential-chains?tabs=dac#defaultazurecredential-overview), which picks up the OIDC token issued by `azure/login`. Without this flag, `pac auth create` will attempt interactive login and fail on CI runners.
 
 ---
 
 ## Azure DevOps: Service Connections
 
-For Azure DevOps, use **Power Platform Service Connections**.
+For Azure DevOps, use **Power Platform Service Connections** with **Workload Identity Federation** (recommended) or client secrets (fallback).
 
-### Create a Client Secret
+### Option A: Workload Identity Federation (Recommended)
+
+> ✅ **Recommended** – No client secrets to manage, no rotation, highest security.
+
+Workload Identity Federation (WIF) lets Azure DevOps authenticate to Entra ID using OIDC tokens, eliminating the need for client secrets.
+
+#### Prerequisites
+
+- Azure DevOps organization connected to your Entra ID tenant
+- **Power Platform Build Tools** extension installed ([marketplace link](https://marketplace.visualstudio.com/items?itemName=microsoft-IsvExpTools.PowerPlatform-BuildTools))
+
+#### Create Federated Service Connections
+
+For each Power Platform environment:
+
+1. In Azure DevOps, go to **Project Settings > Service connections**
+2. Click **New service connection**
+3. Select **Power Platform**
+4. Choose **Workload Identity Federation (automatic)** as the authentication method
+   - If automatic is not available, choose **Workload Identity Federation (manual)** and configure the federated credential in your App Registration
+5. Fill in:
+   - **Server URL**: e.g., `https://yourorg-test.crm.dynamics.com`
+   - **Tenant ID**: Your directory (tenant) ID
+   - **Application (client) ID**: From App Registration
+   - **Service connection name**: e.g., `powerplatform-test` (use this name in your pipelines)
+6. Check **Grant access to all pipelines** (or manage per-pipeline)
+7. Click **Save**
+
+Repeat for each environment (`dev`, `test`, `prod`).
+
+> 💡 **Automatic vs Manual**: The **automatic** option creates the federated credential in Entra ID for you. Choose **manual** if you need to configure the App Registration yourself or don't have Entra ID permissions from Azure DevOps.
+
+### Option B: Client Secret (Fallback)
+
+If Workload Identity Federation is not available (e.g., organizational restrictions, Entra ID not connected to Azure DevOps), use client secrets.
+
+> ⚠️ **Not recommended** – Client secrets require rotation (max 24 months) and are less secure than WIF.
+
+#### Create a Client Secret
 
 1. In your App Registration, go to **Certificates & secrets**
 2. Click **New client secret**
 3. Set expiration (max 24 months)
 4. **Copy the secret value immediately** – you won't see it again
 
-### Create Service Connections
+### Create Service Connections (Client Secret)
 
 For each Power Platform environment:
 
@@ -200,6 +240,28 @@ Update the `targetEnvironments` parameter in `.pipelines/build-and-deploy.yml`:
 ```
 
 ### How It Works (Azure DevOps)
+
+#### With Workload Identity Federation (Recommended)
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Azure DevOps   │────▶│  Microsoft       │────▶│  Power Platform │
+│  Pipeline       │     │  Entra ID        │     │  Environment    │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+        │                        │                        │
+        │  1. Service Connection │                        │
+        │  requests OIDC token   │                        │
+        │ ─────────────────────▶ │                        │
+        │                        │  2. Validate federated │
+        │                        │     credential         │
+        │  3. Issue access token │                        │
+        │ ◀───────────────────── │                        │
+        │                        │                        │
+        │  4. Authenticate to Power Platform              │
+        │ ───────────────────────────────────────────────▶│
+```
+
+#### With Client Secret (Fallback)
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -391,8 +453,9 @@ permissions:
 - ✅ Use GitHub environment protection rules
 
 ### Azure DevOps: Service Connections
+- ✅ Use **Workload Identity Federation** to eliminate client secrets (recommended)
 - ✅ Use the **Power Platform** service connection type (not generic)
-- ✅ Set short client secret expiration and track renewal dates
+- ✅ If using client secrets, set short expiration and track renewal dates
 - ✅ Use per-pipeline permissions instead of "grant access to all pipelines"
 - ✅ Regularly audit service connection usage in the project
 
@@ -420,11 +483,11 @@ permissions:
 
 ## Comparison: Authentication Methods
 
-| Aspect | Federated Credentials (GitHub) | Service Connection (Azure DevOps) | Client Secrets (GitHub) |
-|--------|-------------------------------|----------------------------------|------------------------|
-| Secret rotation | Not needed | Required (max 24 months) | Required (max 24 months) |
-| Token lifetime | Minutes | Until revoked | Until revoked |
-| Setup complexity | Moderate | Moderate | Simple |
-| Security | Highest | High | Lower |
-| Maintenance | Lowest | Medium | Highest |
-| **Recommendation** | **✅ Best for GitHub** | **✅ Best for Azure DevOps** | ⚠️ Only if required |
+| Aspect | Federated Credentials (GitHub) | WIF Service Connection (Azure DevOps) | Client Secret Service Connection (Azure DevOps) | Client Secrets (GitHub) |
+|--------|-------------------------------|--------------------------------------|------------------------------------------------|------------------------|
+| Secret rotation | Not needed | Not needed | Required (max 24 months) | Required (max 24 months) |
+| Token lifetime | Minutes | Minutes | Until revoked | Until revoked |
+| Setup complexity | Moderate | Low–Moderate | Moderate | Simple |
+| Security | Highest | Highest | High | Lower |
+| Maintenance | Lowest | Lowest | Medium | Highest |
+| **Recommendation** | **✅ Best for GitHub** | **✅ Best for Azure DevOps** | ⚠️ Fallback if WIF unavailable | ⚠️ Only if required |

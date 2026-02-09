@@ -87,7 +87,7 @@ This repository provides everything you need to implement Application Lifecycle 
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | End-to-end setup for first-time users |
-| [Authentication Setup](docs/authentication.md) | Federated credentials (GitHub) and Service Connections (Azure DevOps) |
+| [Authentication Setup](docs/authentication.md) | Federated credentials (GitHub) and Workload Identity Federation (Azure DevOps) |
 | [Azure DevOps Setup](docs/azure-devops-setup.md) | Azure DevOps-specific pipeline and environment configuration |
 | [Building Copilot Studio Agents](docs/building-agents.md) | Best practices for agent development |
 | [Environment Configuration](docs/environment-configuration.md) | Deployment settings, connection references, environment variables |
@@ -120,12 +120,12 @@ See [Authentication Setup](docs/authentication.md) for detailed instructions.
 |----------|---------|-------------|
 | `POWERPLATFORM_ENVIRONMENT_URL` | `https://yourorg-test.crm.dynamics.com` | Target environment URL |
 
-### Option B: Azure DevOps (Service Connections)
+### Option B: Azure DevOps (Workload Identity Federation)
 
-Use **Power Platform Service Connections** in Azure DevOps:
+Use **Workload Identity Federation (WIF) service connections** in Azure DevOps (recommended) – no secrets to manage:
 
 1. Create an App Registration
-2. Create Service Connections in your Azure DevOps project
+2. Create WIF Service Connections in your Azure DevOps project
 3. Configure as Application User in Power Platform
 4. Update `.pipelines/environment-variables.yml`
 

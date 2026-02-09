@@ -38,6 +38,8 @@ Before you begin, ensure you have:
 
 Both platforms require a **Service Principal** (App Registration) with access to your Power Platform environments.
 
+> 💡 **Don't forget**: Update `.github/CODEOWNERS` to replace `@your-team` with your actual team or user handles. This ensures the right people are automatically added as reviewers on PRs.
+
 ### Common Steps (Both Platforms)
 
 1. Create an App Registration in Microsoft Entra ID
@@ -54,10 +56,11 @@ See [Authentication Setup](authentication.md) for detailed instructions.
 
 ### Azure DevOps – Service Connections
 
-4. Create a **client secret** for the App Registration (or use a certificate)
-5. In Azure DevOps, go to **Project Settings > Service connections**
-6. Create a **Power Platform** service connection for each environment
-7. Update `.pipelines/environment-variables.yml` with your connection names and URLs
+4. In Azure DevOps, go to **Project Settings > Service connections**
+5. Create a **Power Platform** service connection for each environment
+   - Choose **Workload Identity Federation** (recommended) to avoid managing client secrets
+   - Or use a **client secret** if WIF is not available
+6. Update `.pipelines/environment-variables.yml` with your connection names and URLs
 
 See [Azure DevOps Setup](azure-devops-setup.md) for detailed instructions.
 
