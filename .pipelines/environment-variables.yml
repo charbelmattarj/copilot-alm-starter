@@ -1,0 +1,29 @@
+# Centralized Power Platform Environment / Pipeline Configuration
+# Update these variables for your project
+#
+# See docs/azure-devops-setup.md for detailed configuration instructions.
+
+variables:
+  # ──────────────────────────────────────────────────────
+  # Service Identity
+  # ──────────────────────────────────────────────────────
+  - name: serviceName
+    value: "YourServiceName"
+
+  # ──────────────────────────────────────────────────────
+  # Author (Development) Environment
+  # ──────────────────────────────────────────────────────
+  - name: authorEnvironmentUrl
+    value: "https://yourorg-dev.crm.dynamics.com"
+  - name: authorServiceConnection
+    value: "your-powerplatform-dev-connection"
+
+  # ──────────────────────────────────────────────────────
+  # Common Pipeline Settings
+  # ──────────────────────────────────────────────────────
+  - name: targetBranch
+    value: "main"
+  - name: solutionRootFolder
+    value: "solutions"
+  - name: maxAsyncWaitTime
+    value: 60

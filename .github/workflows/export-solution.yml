@@ -1,0 +1,202 @@
+# Export Solution Workflow
+# Exports a Power Platform solution from the development environment
+# and creates a pull request with the changes
+
+name: Export Solution
+
+on:
+    workflow_dispatch:
+        inputs:
+            solution_name:
+                description: "Solution unique name to export"
+                required: true
+                type: string
+            environment_url:
+                description: "Source environment URL"
+                required: true
+                type: string
+                default: "https://yourorg-dev.crm.dynamics.com"
+            target_branch:
+                description: "Target branch for the PR"
+                required: false
+                type: string
+                default: "main"
+
+# Prevent concurrent exports of the same solution
+concurrency:
+    group: export-${{ github.workflow }}-${{ inputs.solution_name }}
+    cancel-in-progress: false
+
+env:
+    SOLUTION_FOLDER: solutions/${{ inputs.solution_name }}
+
+jobs:
+    export-solution:
+        runs-on: windows-latest
+        environment: dev # Uses federated credential for 'dev' environment
+
+        permissions:
+            id-token: write # Required for federated credentials (OIDC)
+            contents: write
+            pull-requests: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            # Authenticate using Workload Identity Federation (recommended)
+            - name: Azure Login (Federated Credentials)
+              uses: azure/login@v2
+              with:
+                  client-id: ${{ vars.AZURE_CLIENT_ID }}
+                  tenant-id: ${{ vars.AZURE_TENANT_ID }}
+                  allow-no-subscriptions: true
+
+            - name: Install Power Platform CLI
+              uses: microsoft/powerplatform-actions/actions-install@v1
+
+            - name: Create PAC auth profile
+              shell: pwsh
+              run: |
+                  pac auth create --environment "${{ inputs.environment_url }}" --name "export-profile" --managedIdentity
+
+            - name: Verify connection
+              shell: pwsh
+              run: |
+                  $result = pac org who
+                  Write-Host $result
+                  if ($LASTEXITCODE -ne 0) {
+                      Write-Error "Failed to connect to Power Platform environment"
+                      exit 1
+                  }
+
+            - name: Export solution (unmanaged)
+              shell: pwsh
+              run: |
+                  pac solution export `
+                    --name "${{ inputs.solution_name }}" `
+                    --path "${{ runner.temp }}/${{ inputs.solution_name }}.zip" `
+                    --managed false `
+                    --overwrite
+
+            - name: Unpack solution
+              uses: microsoft/powerplatform-actions/unpack-solution@v1
+              with:
+                  solution-file: ${{ runner.temp }}/${{ inputs.solution_name }}.zip
+                  solution-folder: ${{ env.SOLUTION_FOLDER }}
+                  solution-type: "Unmanaged"
+                  overwrite-files: true
+
+            - name: Extract solution metadata
+              shell: pwsh
+              run: |
+                  $solutionXml = "./${{ env.SOLUTION_FOLDER }}/Other/Solution.xml"
+
+                  if (Test-Path $solutionXml) {
+                      [xml]$xml = Get-Content $solutionXml
+                      $version = $xml.ImportExportXml.SolutionManifest.Version
+                      $publisher = $xml.ImportExportXml.SolutionManifest.Publisher.UniqueName
+                      
+                      Write-Host "Solution Version: $version"
+                      Write-Host "Publisher: $publisher"
+                      
+                      echo "SOLUTION_VERSION=$version" >> $env:GITHUB_ENV
+                      echo "SOLUTION_PUBLISHER=$publisher" >> $env:GITHUB_ENV
+                  } else {
+                      Write-Warning "Solution.xml not found"
+                      echo "SOLUTION_VERSION=Unknown" >> $env:GITHUB_ENV
+                  }
+
+            - name: Generate deployment settings template
+              shell: pwsh
+              run: |
+                  $settingsDir = "./settings"
+                  New-Item -ItemType Directory -Force -Path $settingsDir | Out-Null
+
+                  $settingsFile = "$settingsDir/${{ inputs.solution_name }}.settings.json"
+
+                  # Only create if doesn't exist
+                  if (-not (Test-Path $settingsFile)) {
+                      pac solution create-settings `
+                          --solution-zip "${{ runner.temp }}/${{ inputs.solution_name }}.zip" `
+                          --settings-file "$settingsFile"
+                      Write-Host "Created settings template: $settingsFile"
+                  } else {
+                      Write-Host "Settings file already exists: $settingsFile"
+                  }
+
+            - name: Check for changes
+              id: changes
+              shell: pwsh
+              run: |
+                  git add -A
+                  $changes = git diff --cached --name-only
+                  if ($changes) {
+                      Write-Host "Changes detected:"
+                      $changes | ForEach-Object { Write-Host "  - $_" }
+                      echo "has_changes=true" >> $env:GITHUB_OUTPUT
+                  } else {
+                      Write-Host "No changes detected"
+                      echo "has_changes=false" >> $env:GITHUB_OUTPUT
+                  }
+
+            - name: Create branch and commit
+              id: commit
+              if: steps.changes.outputs.has_changes == 'true'
+              shell: pwsh
+              run: |
+                  $version = $env:SOLUTION_VERSION
+                  $branchName = "solution/${{ inputs.solution_name }}-v$version"
+
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  # Check if branch exists
+                  $branchExists = git ls-remote --heads origin $branchName
+                  if ($branchExists) {
+                      git checkout $branchName
+                      git pull origin $branchName
+                  } else {
+                      git checkout -b $branchName
+                  }
+
+                  git add -A
+                  git commit -m "chore: export ${{ inputs.solution_name }} v$version"
+                  git push origin $branchName
+
+                  echo "branch_name=$branchName" >> $env:GITHUB_OUTPUT
+                  echo "solution_version=$version" >> $env:GITHUB_OUTPUT
+
+            - name: Create Pull Request
+              if: steps.changes.outputs.has_changes == 'true'
+              uses: actions/github-script@v7
+              env:
+                  BRANCH_NAME: ${{ steps.commit.outputs.branch_name }}
+                  SOLUTION_VER: ${{ steps.commit.outputs.solution_version }}
+              with:
+                  script: |
+                      const branchName = process.env.BRANCH_NAME;
+                      const solutionVersion = process.env.SOLUTION_VER;
+
+                      const { data: prs } = await github.rest.pulls.list({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        head: `${context.repo.owner}:${branchName}`,
+                        state: 'open'
+                      });
+
+                      if (prs.length === 0) {
+                        const pr = await github.rest.pulls.create({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          title: `🤖 Export: ${{ inputs.solution_name }} v${solutionVersion}`,
+                          body: `## Solution Export\n\n**Solution:** ${{ inputs.solution_name }}\n**Version:** ${solutionVersion}\n**Source:** ${{ inputs.environment_url }}\n\n### Changes\nThis PR contains the latest export from the development environment.\n\n### Checklist\n- [ ] Review solution components\n- [ ] Verify no unintended changes\n- [ ] Update deployment settings if needed`,
+                          head: branchName,
+                          base: '${{ inputs.target_branch }}'
+                        });
+                        console.log(`Created PR #${pr.data.number}`);
+                      } else {
+                        console.log(`PR already exists: #${prs[0].number}`);
+                      }

@@ -1,0 +1,108 @@
+# Validate Pull Request Pipeline (Azure DevOps)
+# Runs validation checks on PRs that modify solutions.
+#
+# Trigger: PR to main branch (solutions/ or settings/ paths)
+# See docs/azure-devops-setup.md for setup instructions.
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - solutions/*
+      - settings/*
+
+variables:
+  - template: environment-variables.yml
+
+pool:
+  vmImage: "windows-latest"
+
+jobs:
+  - job: Validate
+    displayName: "Validate Solution Changes"
+
+    steps:
+      - checkout: self
+        fetchDepth: 0
+
+      - task: PowerPlatformToolInstaller@2
+        displayName: "Install Power Platform CLI"
+        inputs:
+          DefaultVersion: true
+          AddToolsToPath: true
+
+      - task: PowerShell@2
+        displayName: "Detect changed solutions"
+        name: detect
+        inputs:
+          targetType: inline
+          script: |
+            $changedFiles = git diff --name-only origin/$(System.PullRequest.TargetBranch)...HEAD
+            $solutions = $changedFiles |
+              Where-Object { $_ -match '^solutions/([^/]+)/' } |
+              ForEach-Object { $matches[1] } |
+              Select-Object -Unique
+
+            if ($solutions) {
+              $json = $solutions | ConvertTo-Json -Compress
+              if ($solutions.Count -eq 1) { $json = "[$json]" }
+              Write-Host "##vso[task.setvariable variable=SOLUTIONS;isOutput=true]$json"
+              Write-Host "Solutions to validate: $($solutions -join ', ')"
+            } else {
+              Write-Host "##vso[task.setvariable variable=SOLUTIONS;isOutput=true][]"
+              Write-Host "No solution changes detected"
+            }
+
+      - task: PowerShell@2
+        displayName: "Validate solution structure"
+        inputs:
+          targetType: inline
+          script: |
+            $solutions = '$(detect.SOLUTIONS)' | ConvertFrom-Json
+
+            foreach ($solution in $solutions) {
+              Write-Host "Validating: $solution"
+              $solutionPath = "./$(solutionRootFolder)/$solution"
+
+              & "$(Build.SourcesDirectory)/scripts/validate-solution.ps1" -SolutionFolder $solutionPath
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "Validation failed for $solution"
+                exit 1
+              }
+            }
+
+      - task: PowerShell@2
+        displayName: "Test solution pack"
+        inputs:
+          targetType: inline
+          script: |
+            $solutions = '$(detect.SOLUTIONS)' | ConvertFrom-Json
+
+            foreach ($solution in $solutions) {
+              Write-Host "Testing pack for: $solution"
+
+              $solutionPath = "./$(solutionRootFolder)/$solution"
+              $outputFile = "$(Agent.TempDirectory)/${solution}_test.zip"
+
+              try {
+                pac solution pack `
+                  --zipfile "$outputFile" `
+                  --folder "$solutionPath" `
+                  --packagetype Unmanaged
+
+                if (Test-Path $outputFile) {
+                  $size = (Get-Item $outputFile).Length / 1MB
+                  Write-Host "  ✅ Pack successful ($([math]::Round($size, 2)) MB)"
+                } else {
+                  Write-Error "Pack did not produce output file"
+                  exit 1
+                }
+              } catch {
+                Write-Error "Pack failed: $($_.Exception.Message)"
+                exit 1
+              }
+            }
