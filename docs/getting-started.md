@@ -27,7 +27,7 @@ Before you begin, ensure you have:
 1. Create a new repository in your Azure DevOps project
 2. Clone this starter kit and push it to your new repo:
    ```bash
-   git clone https://github.com/microsoft/mcs-alm-starter.git my-company-agents
+   git clone https://github.com/microsoft/copilot-alm-starter.git my-company-agents
    cd my-company-agents
    git remote set-url origin https://dev.azure.com/yourorg/yourproject/_git/my-company-agents
    git push -u origin --all

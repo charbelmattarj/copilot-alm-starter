@@ -1,4 +1,4 @@
-# MCS ALM Starter
+# Copilot ALM Starter
 
 A lightweight ALM toolkit for Copilot Studio agents – CI/CD pipelines, best practices, and deployment guidance for **both GitHub Actions and Azure DevOps Pipelines**.
 
