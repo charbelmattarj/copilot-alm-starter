@@ -57,15 +57,15 @@ jobs:
             - name: Install Power Platform CLI
               uses: microsoft/powerplatform-actions/actions-install@v1
 
-            - name: Create PAC auth profile
+            - name: Create  auth profile
               shell: pwsh
               run: |
-                & "$env:POWERPLATFORMTOOLS_PACPATH" auth create --environment "${{ inputs.environment_url }}" --name "export-profile" --managedIdentity
+                & "$env:POWERPLATFORMTOOLS_PATH" auth create --environment "${{ inputs.environment_url }}" --name "export-profile" --managedIdentity
 
             - name: Verify connection
               shell: pwsh
               run: |
-                  $result = pac org who
+                  $result = & "$env:POWERPLATFORMTOOLS_PACPATH" org who
                   Write-Host $result
                   if ($LASTEXITCODE -ne 0) {
                       Write-Error "Failed to connect to Power Platform environment"
@@ -75,7 +75,7 @@ jobs:
             - name: Export solution (unmanaged)
               shell: pwsh
               run: |
-                  pac solution export `
+                  & "$env:POWERPLATFORMTOOLS_PACPATH" solution export `
                     --name "${{ inputs.solution_name }}" `
                     --path "${{ runner.temp }}/${{ inputs.solution_name }}.zip" `
                     --managed false `
@@ -119,7 +119,7 @@ jobs:
 
                   # Only create if doesn't exist
                   if (-not (Test-Path $settingsFile)) {
-                      pac solution create-settings `
+                      & "$env:POWERPLATFORMTOOLS_PACPATH" solution create-settings `
                           --solution-zip "${{ runner.temp }}/${{ inputs.solution_name }}.zip" `
                           --settings-file "$settingsFile"
                       Write-Host "Created settings template: $settingsFile"
