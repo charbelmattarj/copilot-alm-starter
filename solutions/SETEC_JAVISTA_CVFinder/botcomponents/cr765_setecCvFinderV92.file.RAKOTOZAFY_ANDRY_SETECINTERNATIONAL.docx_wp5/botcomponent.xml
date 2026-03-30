@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.RAKOTOZAFY_ANDRY_SETECINTERNATIONAL.docx_wp5">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in RAKOTOZAFY_ANDRY_SETEC INTERNATIONAL.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">RAKOTOZAFY_ANDRY_SETEC%20INTERNATIONAL.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>RAKOTOZAFY_ANDRY_SETEC INTERNATIONAL.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

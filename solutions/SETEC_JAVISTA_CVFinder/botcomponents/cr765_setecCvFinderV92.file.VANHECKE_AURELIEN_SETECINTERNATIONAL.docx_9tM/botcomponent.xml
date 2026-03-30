@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.VANHECKE_AURELIEN_SETECINTERNATIONAL.docx_9tM">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in VAN HECKE_AURELIEN_SETEC INTERNATIONAL.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">VAN%20HECKE_AURELIEN_SETEC%20INTERNATIONAL.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>VAN HECKE_AURELIEN_SETEC INTERNATIONAL.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

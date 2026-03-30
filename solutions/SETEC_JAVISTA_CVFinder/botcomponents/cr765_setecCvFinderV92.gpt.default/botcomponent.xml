@@ -1,0 +1,11 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.gpt.default">
+  <componenttype>15</componenttype>
+  <description>Retrieves and ranks CVs based on user-defined criteria, dynamically adapting its search and ranking process according to the role description extracted from a specific RFP.</description>
+  <iscustomizable>0</iscustomizable>
+  <name>SETEC CV Finder V9.2</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

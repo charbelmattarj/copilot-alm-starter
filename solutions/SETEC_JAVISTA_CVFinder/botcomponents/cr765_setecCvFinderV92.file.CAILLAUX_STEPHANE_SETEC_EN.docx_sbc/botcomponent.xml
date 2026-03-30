@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.CAILLAUX_STEPHANE_SETEC_EN.docx_sbc">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in CAILLAUX_STEPHANE_SETEC_EN.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">CAILLAUX_STEPHANE_SETEC_EN.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>CAILLAUX_STEPHANE_SETEC_EN.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

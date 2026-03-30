@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.BlancOlivier_eng061020.docx_ghr">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in Blanc Olivier_eng 06 10 20.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">Blanc%20Olivier_eng%2006%2010%2020.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>Blanc Olivier_eng 06 10 20.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

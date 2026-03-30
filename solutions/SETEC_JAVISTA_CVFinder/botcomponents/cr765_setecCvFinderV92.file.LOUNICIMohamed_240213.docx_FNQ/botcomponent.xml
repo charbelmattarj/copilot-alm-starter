@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.LOUNICIMohamed_240213.docx_FNQ">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in LOUNICI Mohamed_240213.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">LOUNICI%20Mohamed_240213.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>LOUNICI Mohamed_240213.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

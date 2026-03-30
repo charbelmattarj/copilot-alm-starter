@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.CHANTEPIEMarc_11102023en.docx_Xnb">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in CHANTEPIE Marc_11102023 en.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">CHANTEPIE%20Marc_11102023%20en.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>CHANTEPIE Marc_11102023 en.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

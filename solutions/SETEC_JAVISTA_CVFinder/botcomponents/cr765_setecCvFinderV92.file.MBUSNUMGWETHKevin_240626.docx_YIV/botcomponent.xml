@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.MBUSNUMGWETHKevin_240626.docx_YIV">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in MBUSNUM GWETH Kevin_240626.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">MBUSNUM%20GWETH%20Kevin_240626.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>MBUSNUM GWETH Kevin_240626.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

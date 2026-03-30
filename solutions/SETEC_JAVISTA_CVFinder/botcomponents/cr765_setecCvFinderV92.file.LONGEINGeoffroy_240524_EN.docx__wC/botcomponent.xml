@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.LONGEINGeoffroy_240524_EN.docx__wC">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in LONGEIN Geoffroy_240524_EN.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">LONGEIN%20Geoffroy_240524_EN.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>LONGEIN Geoffroy_240524_EN.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>
