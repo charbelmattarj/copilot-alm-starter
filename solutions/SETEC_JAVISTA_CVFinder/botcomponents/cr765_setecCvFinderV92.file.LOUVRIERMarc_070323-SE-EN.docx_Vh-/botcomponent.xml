@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.LOUVRIERMarc_070323-SE-EN.docx_Vh-">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in LOUVRIER Marc_070323 -SE-EN.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">LOUVRIER%20Marc_070323%20-SE-EN.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>LOUVRIER Marc_070323 -SE-EN.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

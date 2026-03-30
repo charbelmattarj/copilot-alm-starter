@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.CABONFranois_EN_05.2023.docx_Xl2">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in CABON François_EN_05.2023.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">CABON%20Fran%C3%A7ois_EN_05.2023.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>CABON François_EN_05.2023.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

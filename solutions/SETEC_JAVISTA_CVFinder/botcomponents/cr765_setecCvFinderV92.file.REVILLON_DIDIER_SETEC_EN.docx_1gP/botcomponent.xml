@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.REVILLON_DIDIER_SETEC_EN.docx_1gP">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in REVILLON_DIDIER_SETEC_EN.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">REVILLON_DIDIER_SETEC_EN.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>REVILLON_DIDIER_SETEC_EN.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

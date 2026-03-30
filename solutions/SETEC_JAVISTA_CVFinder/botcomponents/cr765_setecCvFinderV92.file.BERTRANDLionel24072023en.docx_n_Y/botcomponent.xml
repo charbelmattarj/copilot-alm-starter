@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.BERTRANDLionel24072023en.docx_n_Y">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in BERTRAND Lionel 24072023 en.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">BERTRAND%20Lionel%2024072023%20en.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>BERTRAND Lionel 24072023 en.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

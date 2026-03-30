@@ -1,0 +1,12 @@
+<botcomponent schemaname="cr765_setecCvFinderV92.file.GIRALDO_LIA_SETEC_EN.docx_4hQ">
+  <componenttype>14</componenttype>
+  <description>This knowledge source searches information contained in GIRALDO_LIA_SETEC_EN.docx</description>
+  <filedata mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document">GIRALDO_LIA_SETEC_EN.docx</filedata>
+  <iscustomizable>0</iscustomizable>
+  <name>GIRALDO_LIA_SETEC_EN.docx</name>
+  <parentbotid>
+    <schemaname>cr765_setecCvFinderV92</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>
