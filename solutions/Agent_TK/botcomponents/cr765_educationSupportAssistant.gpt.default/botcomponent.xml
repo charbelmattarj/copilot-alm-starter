@@ -1,0 +1,11 @@
+<botcomponent schemaname="cr765_educationSupportAssistant.gpt.default">
+  <componenttype>15</componenttype>
+  <description>An agent that provides educational resources, answers academic questions, and assists with learning activities.</description>
+  <iscustomizable>0</iscustomizable>
+  <name>Education Support Assistant</name>
+  <parentbotid>
+    <schemaname>cr765_educationSupportAssistant</schemaname>
+  </parentbotid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>
