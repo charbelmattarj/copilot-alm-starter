@@ -60,7 +60,8 @@ jobs:
             - name: Create PAC auth profile
               shell: pwsh
               run: |
-                  pac auth create --environment "${{ inputs.environment_url }}" --name "export-profile" --managedIdentity
+                $env:PATH += ";$env:POWERPLATFORMTOOLS_PACPATH"
+                pac auth create --environment "${{ inputs.environment_url }}" --name "export-profile" --managedIdentity
 
             - name: Verify connection
               shell: pwsh
